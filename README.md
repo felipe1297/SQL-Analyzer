@@ -17,7 +17,7 @@ The SQL Analyzer is a tool designed to analyze SQL scripts, identify code smells
 ### Setup
 1. **Clone the repository**:
     ```bash
-    git clone https://your-repo-url.git
+    git clone [https://your-repo-url.git](https://github.com/felipe1297/SQL-Analyzer)
     cd sql-analyzer
     ```
 
@@ -43,6 +43,9 @@ This project is licensed under the Proprietary License. See the [LICENSE](LICENS
 
 ## Acknowledgments
 This project was developed as part of the Systems and Computer Engineering program at the National University of Colombia - Bogotá Campus (Universidad Nacional de Colombia - Sede Bogotá). The knowledge and skills used to create this tool were acquired through the coursework and guidance provided in the program.
+
+Special thanks to **Professor PhD Felipe Restrepo Calle** for his invaluable guidance and support throughout the course.
+
 
 ## Authors
 - **Felipe Esteban Riaño Pineda**
