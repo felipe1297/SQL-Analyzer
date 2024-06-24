@@ -1,5 +1,8 @@
 grammar postgreSqlGrammar;
 
+options {
+    caseInsensitive = true;
+}
 
 // Reglas Sintácticas
 sql_stmt : select_stmt SEMI
@@ -7,7 +10,7 @@ sql_stmt : select_stmt SEMI
          ;
 
 select_stmt
-    : with_clause? SELECT (STAR | (result_column (COMMA result_column)*))
+    : (WITH with_clause)? SELECT (STAR | (result_column (COMMA result_column)*))
       FROM table_reference (join_clause)* (WHERE expr)? (group_by_clause)? (order_by_clause)?
     ;
 
@@ -15,16 +18,42 @@ function_stmt
     : CREATE FUNCTION ID LPAREN function_params? RPAREN RETURNS ID AS func_body
     ;
 
-function_params
-    : function_param (COMMA function_param)*
+data_type
+    : VARCHAR LPAREN NUMBER RPAREN
+    | INT
+    | NUMERIC LPAREN NUMBER COMMA NUMBER RPAREN
+    | TEXT
+    | DATE
+    | TIMESTAMP
+    | BOOL
+    | SERIAL
+    | BIGSERIAL
+    | UUID
+    | JSON
+    | JSONB
+    | BYTEA
+    | FLOAT
+    | REAL
+    | DOUBLE
+    | DECIMAL LPAREN NUMBER COMMA NUMBER RPAREN
+    | MONEY
+    | SMALLINT
+    | BIGINT
+    | CHAR LPAREN NUMBER RPAREN
+    | BIT LPAREN NUMBER RPAREN
+    | INTERVAL
     ;
 
-function_param
-    : ID ID
+function_params
+    : ID data_type (COMMA ID data_type)*
     ;
 
 func_body
     : expr
+    ;
+
+limit_offset_clause
+    : (OFFSET expr ROWS)? (FETCH FIRST expr ROWS ONLY)?
     ;
 
 with_clause
@@ -128,6 +157,32 @@ function_arg
     ;
 
 // Reglas Léxicas
+fragment IdentifierStartChar: [a-z_]| [\u0100-\uD7FF\uE000-\uFFFF];
+fragment IdentifierChar: IdentifierStartChar | [0-9] | '$' ;
+ID: IdentifierStartChar IdentifierChar*;
+VARCHAR : 'VARCHAR';
+INT : 'INT';
+NUMERIC : 'NUMERIC';
+TEXT : 'TEXT';
+DATE : 'DATE';
+TIMESTAMP : 'TIMESTAMP';
+BOOL : 'BOOL';
+SERIAL : 'SERIAL';
+BIGSERIAL : 'BIGSERIAL';
+UUID : 'UUID';
+JSON : 'JSON';
+JSONB : 'JSONB';
+BYTEA : 'BYTEA';
+FLOAT : 'FLOAT';
+REAL : 'REAL';
+DOUBLE : 'DOUBLE';
+DECIMAL : 'DECIMAL';
+MONEY : 'MONEY';
+SMALLINT : 'SMALLINT';
+BIGINT : 'BIGINT';
+CHAR : 'CHAR';
+BIT : 'BIT';
+INTERVAL : 'INTERVAL';
 SELECT : 'SELECT';
 WITH   : 'WITH';
 FROM   : 'FROM';
@@ -174,7 +229,11 @@ VAR_POP : 'VAR_POP';
 VAR_SAMP : 'VAR_SAMP';
 STDDEV_POP : 'STDDEV_POP';
 STDDEV_SAMP : 'STDDEV_SAMP';
-ID     : [a-zA-Z_][a-zA-Z0-9_]*;
+OFFSET : 'OFFSET';
+FETCH : 'FETCH';
+FIRST : 'FIRST';
+ROWS : 'ROWS';
+ONLY : 'ONLY';
 STRING : '\'' ( ~'\'' | '\'\'' )* '\'';
 NUMBER : [0-9]+;
 STAR   : '*';
