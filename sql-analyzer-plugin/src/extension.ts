@@ -13,8 +13,8 @@ const codeSmellDecorationType = vscode.window.createTextEditorDecorationType({
     isWholeLine: true
 });
 
-const secretKey = crypto.randomBytes(32); // Use a secure way to manage this key
-const iv = crypto.randomBytes(16); // Initialization vector
+const secretKey = crypto.randomBytes(32);
+const iv = crypto.randomBytes(16);
 
 function resetDecorations(editor: vscode.TextEditor) {
     editor.setDecorations(errorDecorationType, []);
@@ -107,10 +107,8 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
         if (editor) {
             console.log("Applying decorations...");
 
-            // Reset decorations before applying new ones
             resetDecorations(editor);
 
-            // Show lexical errors if any
             if (analysisResults.lexicalErrors.length > 0) {
                 const lexicalErrorDecorations = analysisResults.lexicalErrors.map((error: { line: number; message: string; }) => ({
                     range: new vscode.Range(new vscode.Position(error.line, 0), new vscode.Position(error.line, document.lineAt(error.line).range.end.character)),
@@ -123,7 +121,6 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                 return;
             }
 
-            // Show syntax errors if any
             if (analysisResults.syntaxErrors.length > 0) {
                 const syntaxErrorDecorations = analysisResults.syntaxErrors.map((error: { line: number; message: string; }) => ({
                     range: new vscode.Range(new vscode.Position(error.line, 0), new vscode.Position(error.line, document.lineAt(error.line).range.end.character)),
@@ -136,7 +133,6 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                 return;
             }
 
-            // Apply decorations for code smells if no errors
             const codeSmellDecorations = analysisResults.codeSmells.map((smell: { line: number; message: string; }) => ({
                 range: new vscode.Range(new vscode.Position(smell.line, 0), new vscode.Position(smell.line, document.lineAt(smell.line).range.end.character)),
                 hoverMessage: smell.message
@@ -146,7 +142,6 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
 
             vscode.window.showInformationMessage(`✅ Analysis completed.`);
 
-            // Show the diagram only if requested
             if (showDiagram) {
                 createWebviewPanel(analysisResults.diagram, analysisResults.codeSmells);
             }
@@ -158,7 +153,7 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
     const panel = vscode.window.createWebviewPanel(
         'sqlAnalyzer',
         'SQL Analyzer Diagram',
-        vscode.ViewColumn.Beside, // Open the panel beside the current view
+        vscode.ViewColumn.Beside,
         {
             enableScripts: true,
         }
@@ -168,7 +163,6 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
 
     panel.webview.html = getWebviewContent(diagramContent, codeSmellsHTML);
 
-    // Use setTimeout to delay focusing the current editor
     setTimeout(() => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
@@ -203,10 +197,10 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
 }
 
 export function activate(context: vscode.ExtensionContext) {
+    
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     const realTimeAnalysis = config.get<boolean>('realTimeAnalysis', false);
 
-    // Manual command for full analysis (with diagrams)
     let disposable = vscode.commands.registerCommand('extension.analyzeSQL', () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
@@ -243,7 +237,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(disposable);
 
-    // Real-time analysis on save (without diagrams)
     if (realTimeAnalysis) {
         let onSaveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
             if (document.languageId === 'sql') {
@@ -256,16 +249,15 @@ export function activate(context: vscode.ExtensionContext) {
                     database: config.get<string>('dbDatabase') || ''
                 } : undefined;
 
-                analyzeSQL(query, document, false, credentials); // false to not show diagrams
+                analyzeSQL(query, document, false, credentials);
             }
         });
 
         context.subscriptions.push(onSaveDisposable);
     }
 
-    // Command to update credentials
     let updateCredentialsDisposable = vscode.commands.registerCommand('extension.updateDBCredentials', async () => {
-        const credentials = await getDBCredentials(true); // Pass true to update credentials
+        const credentials = await getDBCredentials(true);
         const valid = await validateDBCredentials(credentials);
 
         if (valid) {
@@ -277,7 +269,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(updateCredentialsDisposable);
 
-    // Command to show saved credentials
     let showCredentialsDisposable = vscode.commands.registerCommand('extension.showDBCredentials', () => {
         const config = vscode.workspace.getConfiguration('sqlAnalyzer');
         const host = config.get<string>('dbHost') || '';

@@ -1,0 +1,99 @@
+{
+    "no_db_access": {
+      "select_star": {
+        "description": "Selecting all columns can be inefficient and lead to excessive data retrieval.",
+        "recommendation": "Select only the necessary columns."
+      },
+      "nested_subqueries": {
+        "description": "Nested subqueries can be inefficient and hard to read.",
+        "recommendation": "Use JOINs when possible."
+      },
+      "join_without_condition": {
+        "description": "Performing a JOIN without a condition can result in a Cartesian product.",
+        "recommendation": "Ensure each JOIN has a proper join condition."
+      },
+      "excessive_function_use": {
+        "description": "Applying functions to columns in the WHERE clauses can prevent index usage.",
+        "recommendation": "Avoid using functions in WHERE clauses."
+      },
+      "contradictory_conditions": {
+        "description": "Conditions that are always false or true, making the query nonsensical.",
+        "recommendation": "Review the logic of the conditions."
+      },
+      "distinct_to_hide_duplicates": {
+        "description": "Using DISTINCT to hide duplicate issues instead of addressing the root cause.",
+        "recommendation": "Investigate and solve the cause of duplicates."
+      },
+      "or_in_where_clause": {
+        "description": "Excessive use of OR can prevent effective use of indexes.",
+        "recommendation": "Consider rewriting the query using UNION or improving the logic."
+      },
+      "aggregate_functions_without_group_by": {
+        "description": "Using aggregate functions without a GROUP BY clause can lead to unexpected results.",
+        "recommendation": "Ensure aggregate functions have an appropriate GROUP BY clause."
+      },
+      "having_instead_of_where": {
+        "description": "HAVING should only be used to filter aggregated results, not for general conditions.",
+        "recommendation": "Use WHERE for general conditions and HAVING for post-aggregation conditions."
+      },
+      "offset_without_limit": {
+        "description": "OFFSET without LIMIT can lead to retrieving large amounts of unnecessary data.",
+        "recommendation": "Always use LIMIT with OFFSET."
+      },
+      "confusing_or_unnecessary_aliases": {
+        "description": "Using unclear or unnecessary aliases can make the code harder to read.",
+        "recommendation": "Use clear aliases only when necessary."
+      }
+    },
+    "db_access": {
+      "missing_indexes_on_joins": {
+        "description": "Lack of indexes on columns used in JOINs can lead to performance degradation.",
+        "recommendation": "Create indexes on columns used in JOINs."
+      },
+      "missing_indexes_on_where": {
+        "description": "Lack of indexes on columns used in WHERE clauses can lead to full table scans.",
+        "recommendation": "Create indexes on columns used in WHERE clauses."
+      },
+      "too_many_columns_in_table": {
+        "description": "Tables with too many columns can be hard to manage and optimize.",
+        "recommendation": "Review the database normalization."
+      },
+      "tables_without_primary_keys": {
+        "description": "Tables without primary keys can lead to data integrity and performance issues.",
+        "recommendation": "Ensure each table has a primary key."
+      },
+      "unused_indexes": {
+        "description": "Indexes that are never used can lead to wasted resources.",
+        "recommendation": "Review and drop unnecessary indexes."
+      },
+      "queries_causing_deadlocks": {
+        "description": "Queries that can lead to deadlocks in the database.",
+        "recommendation": "Review and optimize transactions to avoid deadlocks."
+      },
+      "indexes_on_low_cardinality_columns": {
+        "description": "Indexes on columns with few unique values may not be effective and can increase maintenance costs.",
+        "recommendation": "Evaluate the need for indexes on low cardinality columns."
+      },
+      "large_text_columns_in_select": {
+        "description": "Selecting large text columns unnecessarily can impact performance.",
+        "recommendation": "Select large text columns only when needed."
+      },
+      "queries_without_limits_on_large_tables": {
+        "description": "Queries on large tables without LIMIT clauses can lead to long response times.",
+        "recommendation": "Use LIMIT in queries on large tables to improve performance."
+      },
+      "lack_of_partitioning_on_large_tables": {
+        "description": "Very large tables without partitioning can affect performance.",
+        "recommendation": "Implement partitioning on large tables for query efficiency."
+      },
+      "uncleaned_temporary_data": {
+        "description": "Temporary data that is not cleaned up can grow uncontrollably and affect performance.",
+        "recommendation": "Implement cleanup mechanisms for temporary data."
+      },
+      "inconsistent_foreign_key_relationships": {
+        "description": "Lack of consistency in foreign key relationships can lead to referential integrity issues.",
+        "recommendation": "Review and maintain consistent foreign key relationships."
+      }
+    }
+  }
+  
