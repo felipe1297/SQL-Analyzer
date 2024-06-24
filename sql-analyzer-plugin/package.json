@@ -11,7 +11,8 @@
   ],
   "activationEvents": [
     "onCommand:extension.analyzeSQL",
-    "onCommand:extension.updateDBCredentials"
+    "onCommand:extension.updateDBCredentials",
+    "onCommand:extension.showDBCredentials"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -23,8 +24,48 @@
       {
         "command": "extension.updateDBCredentials",
         "title": "Update Database Credentials"
+      },
+      {
+        "command": "extension.showDBCredentials",
+        "title": "Show Database Credentials"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "SQL Analyzer Configuration",
+      "properties": {
+        "sqlAnalyzer.dbHost": {
+          "type": "string",
+          "default": "",
+          "description": "Database host for SQL Analyzer"
+        },
+        "sqlAnalyzer.dbPort": {
+          "type": "string",
+          "default": "5432",
+          "description": "Database port for SQL Analyzer"
+        },
+        "sqlAnalyzer.dbUser": {
+          "type": "string",
+          "default": "",
+          "description": "Database user for SQL Analyzer"
+        },
+        "sqlAnalyzer.dbPassword": {
+          "type": "string",
+          "default": "",
+          "description": "Database password for SQL Analyzer"
+        },
+        "sqlAnalyzer.dbDatabase": {
+          "type": "string",
+          "default": "",
+          "description": "Database name for SQL Analyzer"
+        },
+        "sqlAnalyzer.realTimeAnalysis": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable real-time analysis of SQL files on save"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

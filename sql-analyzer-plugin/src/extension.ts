@@ -13,7 +13,8 @@ const codeSmellDecorationType = vscode.window.createTextEditorDecorationType({
     isWholeLine: true
 });
 
-const secretKey = 'your-secret-key'; // Use a secure way to manage this key
+const secretKey = crypto.randomBytes(32); // Use a secure way to manage this key
+const iv = crypto.randomBytes(16); // Initialization vector
 
 function resetDecorations(editor: vscode.TextEditor) {
     editor.setDecorations(errorDecorationType, []);
@@ -21,87 +22,73 @@ function resetDecorations(editor: vscode.TextEditor) {
 }
 
 function encrypt(text: string): string {
-    const cipher = crypto.createCipher('aes-256-ctr', secretKey);
+    const cipher = crypto.createCipheriv('aes-256-ctr', secretKey, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     return encrypted;
 }
 
 function decrypt(text: string): string {
-    const decipher = crypto.createDecipher('aes-256-ctr', secretKey);
+    const decipher = crypto.createDecipheriv('aes-256-ctr', secretKey, iv);
     let decrypted = decipher.update(text, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
 }
 
-async function getDBCredentials(): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
+async function getDBCredentials(update: boolean = false): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
-    let host = config.get('dbHost', '');
-    let port = config.get('dbPort', '');
-    let user = config.get('dbUser', '');
-    let encryptedPassword = config.get('dbPassword', '');
-    let database = config.get('dbDatabase', '');
+    let host = update ? '' : config.get<string>('dbHost') || '';
+    let port = update ? '' : config.get<string>('dbPort') || '';
+    let user = update ? '' : config.get<string>('dbUser') || '';
+    let encryptedPassword = update ? '' : config.get<string>('dbPassword') || '';
+    let database = update ? '' : config.get<string>('dbDatabase') || '';
     let password = '';
 
     if (encryptedPassword) {
         password = decrypt(encryptedPassword);
     }
 
-    if (!host) {
-        host = await vscode.window.showInputBox({ prompt: '🌐 Enter Database Host' }) || '';
-        await config.update('dbHost', host, vscode.ConfigurationTarget.Global);
-    }
-    if (!port) {
-        port = await vscode.window.showInputBox({ prompt: '🌐 Enter Database Port', value: '5432' }) || '5432';
-        await config.update('dbPort', port, vscode.ConfigurationTarget.Global);
-    }
-    if (!user) {
-        user = await vscode.window.showInputBox({ prompt: '👤 Enter Database User' }) || '';
-        await config.update('dbUser', user, vscode.ConfigurationTarget.Global);
-    }
-    if (!password) {
-        password = await vscode.window.showInputBox({ prompt: '🔒 Enter Database Password', password: true }) || '';
-        encryptedPassword = encrypt(password);
-        await config.update('dbPassword', encryptedPassword, vscode.ConfigurationTarget.Global);
-    }
-    if (!database) {
-        database = await vscode.window.showInputBox({ prompt: '📂 Enter Database Name' }) || '';
-        await config.update('dbDatabase', database, vscode.ConfigurationTarget.Global);
-    }
+    host = await vscode.window.showInputBox({ prompt: '🌐 Enter Database Host', value: host }) || host;
+    port = await vscode.window.showInputBox({ prompt: '🌐 Enter Database Port', value: port }) || port;
+    user = await vscode.window.showInputBox({ prompt: '👤 Enter Database User', value: user }) || user;
+    password = await vscode.window.showInputBox({ prompt: '🔒 Enter Database Password', value: password, password: true }) || password;
+    encryptedPassword = encrypt(password);
+    database = await vscode.window.showInputBox({ prompt: '📂 Enter Database Name', value: database }) || database;
+
+    await config.update('dbHost', host, vscode.ConfigurationTarget.Global);
+    await config.update('dbPort', port, vscode.ConfigurationTarget.Global);
+    await config.update('dbUser', user, vscode.ConfigurationTarget.Global);
+    await config.update('dbPassword', encryptedPassword, vscode.ConfigurationTarget.Global);
+    await config.update('dbDatabase', database, vscode.ConfigurationTarget.Global);
 
     return { host, port, user, password, database };
 }
 
-async function promptForCredentialsIfNeeded(forcePrompt: boolean): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
-    const config = vscode.workspace.getConfiguration('sqlAnalyzer');
-    let executions = config.get('executionsCount', 0);
+function validateDBCredentials(credentials: { host: string, port: string, user: string, password: string, database: string }): Promise<boolean> {
+    return new Promise((resolve) => {
+        const { host, port, user, password, database } = credentials;
+        const connectionString = `postgresql://${user}:${password}@${host}:${port}/${database}`;
 
-    if (forcePrompt || executions % 5 === 0) {
-        const credentials = await getDBCredentials();
-        await config.update('executionsCount', executions + 1, vscode.ConfigurationTarget.Global);
-        return credentials;
-    } else {
-        let host = config.get('dbHost', '');
-        let port = config.get('dbPort', '');
-        let user = config.get('dbUser', '');
-        let encryptedPassword = config.get('dbPassword', '');
-        let database = config.get('dbDatabase', '');
-        let password = '';
-
-        if (encryptedPassword) {
-            password = decrypt(encryptedPassword);
-        }
-
-        await config.update('executionsCount', executions + 1, vscode.ConfigurationTarget.Global);
-
-        return { host, port, user, password, database };
-    }
+        const testConnectionScriptPath = path.join(__dirname, '..', 'scripts', 'test_connection.py');
+        exec(`python3 ${testConnectionScriptPath} "${connectionString}"`, (err) => {
+            if (err) {
+                resolve(false);
+            } else {
+                resolve(true);
+            }
+        });
+    });
 }
 
-function analyzeSQL(query: string, document: vscode.TextDocument, showDiagram: boolean, credentials: { host: string, port: string, user: string, password: string, database: string }) {
+async function analyzeSQL(query: string, document: vscode.TextDocument, showDiagram: boolean, credentials?: { host: string, port: string, user: string, password: string, database: string }) {
     const scriptPath = path.join(__dirname, '..', 'scripts', 'analyze.py');
+    let command = `python3 ${scriptPath} "${query}"`;
 
-    exec(`python3 ${scriptPath} "${query}" "${credentials.host}" "${credentials.port}" "${credentials.user}" "${credentials.password}" "${credentials.database}"`, (err, stdout, stderr) => {
+    if (credentials) {
+        command += ` "${credentials.host}" "${credentials.port}" "${credentials.user}" "${credentials.password}" "${credentials.database}"`;
+    }
+
+    exec(command, (err, stdout, stderr) => {
         if (err) {
             vscode.window.showErrorMessage(`❌ Error: ${stderr}`);
             return;
@@ -215,24 +202,9 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
         </html>`;
 }
 
-async function analyzeWithCredentials(query: string, document: vscode.TextDocument, showDiagram: boolean, forcePrompt: boolean) {
-    try {
-        const credentials = await promptForCredentialsIfNeeded(forcePrompt);
-        analyzeSQL(query, document, showDiagram, credentials);
-    } catch (error) {
-        vscode.window.showErrorMessage('❌ Failed to get database credentials.');
-        analyzeSQL(query, document, showDiagram, { host: '', port: '', user: '', password: '', database: '' }); // Continue without DB credentials
-    }
-}
-
 export function activate(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
-    const realTimeAnalysis = config.get('realTimeAnalysis', false);
-
-    // Initialize executions count if not already set
-    if (config.get('executionsCount') === undefined) {
-        config.update('executionsCount', 0, vscode.ConfigurationTarget.Global);
-    }
+    const realTimeAnalysis = config.get<boolean>('realTimeAnalysis', false);
 
     // Manual command for full analysis (with diagrams)
     let disposable = vscode.commands.registerCommand('extension.analyzeSQL', () => {
@@ -242,7 +214,25 @@ export function activate(context: vscode.ExtensionContext) {
             const query = document.getText();
 
             if (document.languageId === 'sql') {
-                analyzeWithCredentials(query, document, true, false); // true to show diagrams, false to not force prompt
+                const credentials = config.get<string>('dbHost') ? {
+                    host: config.get<string>('dbHost') || '',
+                    port: config.get<string>('dbPort') || '',
+                    user: config.get<string>('dbUser') || '',
+                    password: decrypt(config.get<string>('dbPassword') || ''),
+                    database: config.get<string>('dbDatabase') || ''
+                } : undefined;
+
+                if (credentials) {
+                    validateDBCredentials(credentials).then((valid) => {
+                        if (!valid) {
+                            vscode.window.showInformationMessage('ℹ️ For a more complete analysis, please provide valid database credentials using the "Update Database Credentials" command in the command palette.');
+                        }
+                        analyzeSQL(query, document, true, credentials); // true to show diagrams
+                    });
+                } else {
+                    analyzeSQL(query, document, true, credentials); // true to show diagrams
+                    vscode.window.showInformationMessage('ℹ️ For a more complete analysis, please provide database credentials using the "Update Database Credentials" command in the command palette.');
+                }
             } else {
                 vscode.window.showErrorMessage('❌ The active document is not a SQL file.');
             }
@@ -258,7 +248,15 @@ export function activate(context: vscode.ExtensionContext) {
         let onSaveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
             if (document.languageId === 'sql') {
                 const query = document.getText();
-                analyzeWithCredentials(query, document, false, false); // false to not show diagrams, false to not force prompt
+                const credentials = config.get<string>('dbHost') ? {
+                    host: config.get<string>('dbHost') || '',
+                    port: config.get<string>('dbPort') || '',
+                    user: config.get<string>('dbUser') || '',
+                    password: decrypt(config.get<string>('dbPassword') || ''),
+                    database: config.get<string>('dbDatabase') || ''
+                } : undefined;
+
+                analyzeSQL(query, document, false, credentials); // false to not show diagrams
             }
         });
 
@@ -267,11 +265,30 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Command to update credentials
     let updateCredentialsDisposable = vscode.commands.registerCommand('extension.updateDBCredentials', async () => {
-        await getDBCredentials();
-        vscode.window.showInformationMessage('🔑 Database credentials updated.');
+        const credentials = await getDBCredentials(true); // Pass true to update credentials
+        const valid = await validateDBCredentials(credentials);
+
+        if (valid) {
+            vscode.window.showInformationMessage('🔑 Database credentials updated and validated successfully.');
+        } else {
+            vscode.window.showErrorMessage('❌ Invalid database credentials. Please try again.');
+        }
     });
 
     context.subscriptions.push(updateCredentialsDisposable);
+
+    // Command to show saved credentials
+    let showCredentialsDisposable = vscode.commands.registerCommand('extension.showDBCredentials', () => {
+        const config = vscode.workspace.getConfiguration('sqlAnalyzer');
+        const host = config.get<string>('dbHost') || '';
+        const port = config.get<string>('dbPort') || '';
+        const user = config.get<string>('dbUser') || '';
+        const database = config.get<string>('dbDatabase') || '';
+
+        vscode.window.showInformationMessage(`🌐 Host: ${host}, Port: ${port}, User: ${user}, Database: ${database}`);
+    });
+
+    context.subscriptions.push(showCredentialsDisposable);
 }
 
 export function deactivate() {}
