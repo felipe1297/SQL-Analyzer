@@ -63,6 +63,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable real-time analysis of SQL files on save"
+        },
+        "sqlAnalyzer.validateWithDB": {
+          "type": "boolean",
+          "default": false,
+          "description": "Analyze with DB"
         }
       }
     }

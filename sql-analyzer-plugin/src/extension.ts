@@ -181,7 +181,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             }
 
             const codeSmellDecorations: vscode.DecorationOptions[] = [];
-            analysisResults.codeSmells.forEach((smell: { line: number; message: string; }) => {
+            analysisResults.codeSmells.forEach((smell: { line: number; message: string; recommendation: string; example: any; }) => {
                 console.log("Before creating decoration range for code smells");
 
                 const adjustedLine = smell.line + lineOffset;
@@ -196,7 +196,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                         
                         codeSmellDecorations.push({
                             range: range,
-                            hoverMessage: smell.message
+                            hoverMessage: `${smell.message}\n${smell.recommendation}`
                         });
                     } catch (err) {
                         console.error("Error creating decoration range for code smells:", err);
@@ -220,7 +220,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
     });
 }
 
-function createWebviewPanel(diagramContent: string, codeSmells: { line: number, message: string }[]) {
+function createWebviewPanel(diagramContent: string, codeSmells: { line: number, message: string, smells: { line: number, code: string, message: string, recommendation: string, example: { bad: string, good: string } }[] }[]) {
     const panel = vscode.window.createWebviewPanel(
         'sqlAnalyzer',
         'SQL Analyzer Diagram',
@@ -230,7 +230,17 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
         }
     );
 
-    const codeSmellsHTML = codeSmells.map(smell => `<p>Line ${smell.line + 1}: ${smell.message}</p>`).join("");
+    const codeSmellsHTML = codeSmells.map(item => item.smells.map(smell => `
+        <div class="code-smell">
+            <p class="message">Line ${smell.line + 1}: ${smell.message}</p>
+            <p class="recommendation">${smell.recommendation}</p>
+            <div class="example">
+                <p><strong>Example:</strong></p>
+                <code class="bad"><strong>Bad:</strong> ${smell.example.bad}</code>
+                <code class="good"><strong>Good:</strong> ${smell.example.good}</code>
+            </div>
+        </div>
+    `).join("")).join("");
 
     panel.webview.html = getWebviewContent(diagramContent, codeSmellsHTML);
 
@@ -251,18 +261,97 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>SQL Analyzer Diagram</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                h1 { font-size: 1.5em; }
-                .diagram { margin-top: 20px; }
-                .code-smells { margin-top: 20px; }
-                .code-smells p { margin: 5px 0; }
+                body {
+                    font-family: Arial, sans-serif;
+                    padding: 20px;
+                    background-color: #f4f4f9;
+                    color: #333;
+                }
+                h1 {
+                    font-size: 1.8em;
+                    color: #4a90e2;
+                }
+                .container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+                .diagram {
+                    margin-top: 20px;
+                    padding: 20px;
+                    background-color: #fff;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    border-radius: 8px;
+                    width: 80%;
+                    max-width: 800px;
+                    min-height: 150px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2em;
+                    color: #999;
+                }
+                .code-smells {
+                    margin-top: 20px;
+                    padding: 20px;
+                    background-color: #fff;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    border-radius: 8px;
+                    width: 80%;
+                    max-width: 800px;
+                }
+                .code-smell {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    margin-bottom: 15px;
+                    animation: fadeIn 1s ease-in-out;
+                }
+                .code-smell .message {
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .code-smell .recommendation {
+                    margin-top: 5px;
+                    color: #4a90e2;
+                }
+                .code-smell .example {
+                    margin-top: 10px;
+                }
+                .example code {
+                    display: block;
+                    background-color: #f0f0f0;
+                    padding: 10px;
+                    border-radius: 4px;
+                    margin-bottom: 5px;
+                    transition: background-color 0.3s ease-in-out;
+                }
+                .example code.bad {
+                    color: #ff4c4c;
+                }
+                .example code.good {
+                    color: #4caf50;
+                }
+                .example code:hover {
+                    background-color: #e0e0e0;
+                }
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                    }
+                    to {
+                        opacity: 1;
+                    }
+                }
             </style>
         </head>
         <body>
-            <h1>SQL Analyzer Diagram</h1>
-            <div class="diagram">${diagramContent}</div>
-            <h1>Code Smells</h1>
-            <div class="code-smells">${codeSmellsHTML}</div>
+            <div class="container">
+                <h1>SQL Analyzer Diagram</h1>
+                <div class="diagram">${diagramContent ? diagramContent : 'No diagram available'}</div>
+                <h1>Code Smells</h1>
+                <div class="code-smells">${codeSmellsHTML}</div>
+            </div>
         </body>
         </html>`;
 }
@@ -271,6 +360,7 @@ export function activate(context: vscode.ExtensionContext) {
     
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     const realTimeAnalysis = config.get<boolean>('realTimeAnalysis', false);
+    const validateWithDB = config.get<boolean>('validateWithDB', true); // Add this configuration option
 
     let disposable = vscode.commands.registerCommand('extension.analyzeSQL', () => {
         const editor = vscode.window.activeTextEditor;
@@ -287,7 +377,7 @@ export function activate(context: vscode.ExtensionContext) {
                     database: config.get<string>('dbDatabase') || ''
                 } : undefined;
 
-                if (credentials) {
+                if (credentials && validateWithDB) {
                     validateDBCredentials(credentials).then((valid) => {
                         if (!valid) {
                             vscode.window.showInformationMessage('ℹ️ For a more complete analysis, please provide valid database credentials using the "Update Database Credentials" command in the command palette.');
@@ -296,7 +386,9 @@ export function activate(context: vscode.ExtensionContext) {
                     });
                 } else {
                     analyzeSQL(query, document, true, credentials); // true to show diagrams
-                    vscode.window.showInformationMessage('ℹ️ For a more complete analysis, please provide database credentials using the "Update Database Credentials" command in the command palette.');
+                    if (!validateWithDB) {
+                        vscode.window.showInformationMessage('ℹ️ Database validation is disabled. For a more complete analysis, consider enabling it in the settings.');
+                    }
                 }
             } else {
                 vscode.window.showErrorMessage('❌ The active document is not a SQL file.');

@@ -16,7 +16,8 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         self.db_access = "db_access"
 
     def visitSelect_stmt(self, ctx):
-        if ctx.STAR():  # Detectar SELECT *
+        # Detect SELECT *
+        if ctx.STAR():
             code = "NDB001"
             message = self.messages[self.no_db_access][code]["description"]
             recommendation = self.messages[self.no_db_access][code]["recommendation"]
@@ -28,7 +29,44 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 "recommendation": recommendation,
                 "example": example
             })
+
+        # Detect nested subqueries in select_stmt
+        self._detect_nested_subqueries(ctx)
+
         return self.visitChildren(ctx)
+
+    def _detect_nested_subqueries(self, ctx):
+        # Check within select_stmt for nested select_stmt
+        for child in ctx.getChildren():
+            if isinstance(child, PostgreSqlGrammarParser.Select_stmtContext):
+                self._add_nested_subquery_smell(child)
+                self._detect_nested_subqueries(child)
+            elif isinstance(child, PostgreSqlGrammarParser.Table_referenceContext):
+                self._detect_nested_subqueries_in_table_reference(child)
+            elif isinstance(child, ParserRuleContext):
+                self._detect_nested_subqueries(child)
+
+    def _detect_nested_subqueries_in_table_reference(self, ctx):
+        # Check within table_reference for nested select_stmt
+        for child in ctx.getChildren():
+            if isinstance(child, PostgreSqlGrammarParser.Select_stmtContext):
+                self._add_nested_subquery_smell(child)
+                self._detect_nested_subqueries(child)
+            elif isinstance(child, ParserRuleContext):
+                self._detect_nested_subqueries(child)
+    
+    def _add_nested_subquery_smell(self, ctx):
+        code = "NDB002"
+        message = self.messages[self.no_db_access][code]["description"]
+        recommendation = self.messages[self.no_db_access][code]["recommendation"]
+        example = self.messages[self.no_db_access][code]["example"]
+        self.smells.append({
+            "line": ctx.start.line,
+            "code": code,
+            "message": message,
+            "recommendation": recommendation,
+            "example": example
+        })
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
@@ -63,7 +101,6 @@ def analyze_sql(sql_content, messages):
 
     # Agrupar mensajes por línea sin duplicados
     detailed_messages = {}
-    unique_smells = {}
 
     for smell in visitor.smells:
         line = smell["line"]
@@ -71,18 +108,16 @@ def analyze_sql(sql_content, messages):
         if line not in detailed_messages:
             detailed_messages[line] = {
                 "line": line,
-                "messages": [],
+                "message": "",
                 "smells": []
             }
-        if code not in unique_smells:
-            unique_smells[code] = smell
-            detailed_messages[line]["messages"].append(f"{smell['code']} - {smell['message']}")
-            detailed_messages[line]["smells"].append(smell)
+        detailed_messages[line]["smells"].append(smell)
+        detailed_messages[line]["message"] += f"{code} - {smell['message']}\n"
 
     detailed_messages_list = [
         {
             "line": k,
-            "message": "\n".join(v["messages"]),
+            "message": v["message"].strip(),
             "smells": v["smells"]
         }
         for k, v in detailed_messages.items()
