@@ -147,7 +147,8 @@ natural_join_type:
 	| NATURAL RIGHT JOIN
 	| NATURAL FULL JOIN;
 
-table_reference: table_name (alias)?;
+table_reference: table_name (alias)?
+    | LPAREN select_stmt RPAREN (alias)?;
 
 table_name: ID;
 

@@ -1,121 +1,190 @@
 {
-  "no_db_access": {
-      "SELECT_STAR": {
-          "code": "NDB001",
-          "description": "Selecting all columns can be inefficient and lead to excessive data retrieval.",
-          "recommendation": "Select only the necessary columns."
-      },
-      "NESTED_SUBQUERIES": {
-          "code": "NDB002",
-          "description": "Nested subqueries can be inefficient and hard to read.",
-          "recommendation": "Use JOINs when possible."
-      },
-      "JOIN_WITHOUT_CONDITION": {
-          "code": "NDB003",
-          "description": "Performing a JOIN without a condition can result in a Cartesian product.",
-          "recommendation": "Ensure each JOIN has a proper join condition."
-      },
-      "EXCESSIVE_FUNCTION_USE": {
-          "code": "NDB004",
-          "description": "Applying functions to columns in the WHERE clauses can prevent index usage.",
-          "recommendation": "Avoid using functions in WHERE clauses."
-      },
-      "CONTRADICTORY_CONDITIONS": {
-          "code": "NDB005",
-          "description": "Conditions that are always false or true, making the query nonsensical.",
-          "recommendation": "Review the logic of the conditions."
-      },
-      "DISTINCT_TO_HIDE_DUPLICATES": {
-          "code": "NDB006",
-          "description": "Using DISTINCT to hide duplicate issues instead of addressing the root cause.",
-          "recommendation": "Investigate and solve the cause of duplicates."
-      },
-      "OR_IN_WHERE_CLAUSE": {
-          "code": "NDB007",
-          "description": "Excessive use of OR can prevent effective use of indexes.",
-          "recommendation": "Consider rewriting the query using UNION or improving the logic."
-      },
-      "AGGREGATE_FUNCTIONS_WITHOUT_GROUP_BY": {
-          "code": "NDB008",
-          "description": "Using aggregate functions without a GROUP BY clause can lead to unexpected results.",
-          "recommendation": "Ensure aggregate functions have an appropriate GROUP BY clause."
-      },
-      "HAVING_INSTEAD_OF_WHERE": {
-          "code": "NDB009",
-          "description": "HAVING should only be used to filter aggregated results, not for general conditions.",
-          "recommendation": "Use WHERE for general conditions and HAVING for post-aggregation conditions."
-      },
-      "OFFSET_WITHOUT_LIMIT": {
-          "code": "NDB010",
-          "description": "OFFSET without LIMIT can lead to retrieving large amounts of unnecessary data.",
-          "recommendation": "Always use LIMIT with OFFSET."
-      },
-      "CONFUSING_OR_UNNECESSARY_ALIASES": {
-          "code": "NDB011",
-          "description": "Using unclear or unnecessary aliases can make the code harder to read.",
-          "recommendation": "Use clear aliases only when necessary."
-      }
-  },
-  "db_access": {
-      "MISSING_INDEXES_ON_JOINS": {
-          "code": "DB001",
-          "description": "Lack of indexes on columns used in JOINs can lead to performance degradation.",
-          "recommendation": "Create indexes on columns used in JOINs."
-      },
-      "MISSING_INDEXES_ON_WHERE": {
-          "code": "DB002",
-          "description": "Lack of indexes on columns used in WHERE clauses can lead to full table scans.",
-          "recommendation": "Create indexes on columns used in WHERE clauses."
-      },
-      "TOO_MANY_COLUMNS_IN_TABLE": {
-          "code": "DB003",
-          "description": "Tables with too many columns can be hard to manage and optimize.",
-          "recommendation": "Review the database normalization."
-      },
-      "TABLES_WITHOUT_PRIMARY_KEYS": {
-          "code": "DB004",
-          "description": "Tables without primary keys can lead to data integrity and performance issues.",
-          "recommendation": "Ensure each table has a primary key."
-      },
-      "UNUSED_INDEXES": {
-          "code": "DB005",
-          "description": "Indexes that are never used can lead to wasted resources.",
-          "recommendation": "Review and drop unnecessary indexes."
-      },
-      "QUERIES_CAUSING_DEADLOCKS": {
-          "code": "DB006",
-          "description": "Queries that can lead to deadlocks in the database.",
-          "recommendation": "Review and optimize transactions to avoid deadlocks."
-      },
-      "INDEXES_ON_LOW_CARDINALITY_COLUMNS": {
-          "code": "DB007",
-          "description": "Indexes on columns with few unique values may not be effective and can increase maintenance costs.",
-          "recommendation": "Evaluate the need for indexes on low cardinality columns."
-      },
-      "LARGE_TEXT_COLUMNS_IN_SELECT": {
-          "code": "DB008",
-          "description": "Selecting large text columns unnecessarily can impact performance.",
-          "recommendation": "Select large text columns only when needed."
-      },
-      "QUERIES_WITHOUT_LIMITS_ON_LARGE_TABLES": {
-          "code": "DB009",
-          "description": "Queries on large tables without LIMIT clauses can lead to long response times.",
-          "recommendation": "Use LIMIT in queries on large tables to improve performance."
-      },
-      "LACK_OF_PARTITIONING_ON_LARGE_TABLES": {
-          "code": "DB010",
-          "description": "Very large tables without partitioning can affect performance.",
-          "recommendation": "Implement partitioning on large tables for query efficiency."
-      },
-      "UNCLEANED_TEMPORARY_DATA": {
-          "code": "DB011",
-          "description": "Temporary data that is not cleaned up can grow uncontrollably and affect performance.",
-          "recommendation": "Implement cleanup mechanisms for temporary data."
-      },
-      "INCONSISTENT_FOREIGN_KEY_RELATIONSHIPS": {
-          "code": "DB012",
-          "description": "Lack of consistency in foreign key relationships can lead to referential integrity issues.",
-          "recommendation": "Review and maintain consistent foreign key relationships."
-      }
-  }
+    "no_db_access": {
+        "NDB001": {
+            "description": "⚠️ Selecting all columns can be inefficient and lead to excessive data retrieval.",
+            "recommendation": "💡 Select only the necessary columns.",
+            "example": {
+                "bad": "SELECT * FROM users;",
+                "good": "SELECT id, name FROM users;"
+            }
+        },
+        "NDB002": {
+            "description": "⚠️ Nested subqueries can be inefficient and hard to read.",
+            "recommendation": "💡 Use JOINs when possible.",
+            "example": {
+                "bad": "SELECT * FROM (SELECT * FROM orders WHERE amount > 100) AS sub;",
+                "good": "SELECT orders.id, orders.amount FROM orders WHERE orders.amount > 100;"
+            }
+        },
+        "NDB003": {
+            "description": "⚠️ Performing a JOIN without a condition can result in a Cartesian product.",
+            "recommendation": "💡 Ensure each JOIN has a proper join condition.",
+            "example": {
+                "bad": "SELECT * FROM users, orders;",
+                "good": "SELECT users.name, orders.amount FROM users JOIN orders ON users.id = orders.user_id;"
+            }
+        },
+        "NDB004": {
+            "description": "⚠️ Applying functions to columns in the WHERE clauses can prevent index usage.",
+            "recommendation": "💡 Avoid using functions in WHERE clauses.",
+            "example": {
+                "bad": "SELECT * FROM users WHERE UPPER(name) = 'JOHN';",
+                "good": "SELECT * FROM users WHERE name = 'John';"
+            }
+        },
+        "NDB005": {
+            "description": "⚠️ Conditions that are always false or true, making the query nonsensical.",
+            "recommendation": "💡 Review the logic of the conditions.",
+            "example": {
+                "bad": "SELECT * FROM users WHERE 1 = 0;",
+                "good": "SELECT * FROM users WHERE active = true;"
+            }
+        },
+        "NDB006": {
+            "description": "⚠️ Using DISTINCT to hide duplicate issues instead of addressing the root cause.",
+            "recommendation": "💡 Investigate and solve the cause of duplicates.",
+            "example": {
+                "bad": "SELECT DISTINCT name FROM users;",
+                "good": "SELECT name FROM users GROUP BY name HAVING COUNT(*) = 1;"
+            }
+        },
+        "NDB007": {
+            "description": "⚠️ Excessive use of OR can prevent effective use of indexes.",
+            "recommendation": "💡 Consider rewriting the query using UNION or improving the logic.",
+            "example": {
+                "bad": "SELECT * FROM users WHERE name = 'John' OR name = 'Jane';",
+                "good": "SELECT * FROM users WHERE name IN ('John', 'Jane');"
+            }
+        },
+        "NDB008": {
+            "description": "⚠️ Using aggregate functions without a GROUP BY clause can lead to unexpected results.",
+            "recommendation": "💡 Ensure aggregate functions have an appropriate GROUP BY clause.",
+            "example": {
+                "bad": "SELECT COUNT(*), name FROM users;",
+                "good": "SELECT COUNT(*), name FROM users GROUP BY name;"
+            }
+        },
+        "NDB009": {
+            "description": "⚠️ HAVING should only be used to filter aggregated results, not for general conditions.",
+            "recommendation": "💡 Use WHERE for general conditions and HAVING for post-aggregation conditions.",
+            "example": {
+                "bad": "SELECT COUNT(*), name FROM users HAVING name = 'John';",
+                "good": "SELECT COUNT(*), name FROM users WHERE name = 'John' GROUP BY name;"
+            }
+        },
+        "NDB010": {
+            "description": "⚠️ OFFSET without LIMIT can lead to retrieving large amounts of unnecessary data.",
+            "recommendation": "💡 Always use LIMIT with OFFSET.",
+            "example": {
+                "bad": "SELECT * FROM users OFFSET 10;",
+                "good": "SELECT * FROM users LIMIT 10 OFFSET 10;"
+            }
+        },
+        "NDB011": {
+            "description": "⚠️ Using unclear or unnecessary aliases can make the code harder to read.",
+            "recommendation": "💡 Use clear aliases only when necessary.",
+            "example": {
+                "bad": "SELECT u.name FROM users u;",
+                "good": "SELECT users.name FROM users;"
+            }
+        }
+    },
+    "db_access": {
+        "DB001": {
+            "description": "⚠️ Lack of indexes on columns used in JOINs can lead to performance degradation.",
+            "recommendation": "💡 Create indexes on columns used in JOINs.",
+            "example": {
+                "bad": "SELECT users.name, orders.amount FROM users JOIN orders ON users.id = orders.user_id;",
+                "good": "CREATE INDEX idx_users_id ON users(id);"
+            }
+        },
+        "DB002": {
+            "description": "⚠️ Lack of indexes on columns used in WHERE clauses can lead to full table scans.",
+            "recommendation": "💡 Create indexes on columns used in WHERE clauses.",
+            "example": {
+                "bad": "SELECT * FROM users WHERE name = 'John';",
+                "good": "CREATE INDEX idx_users_name ON users(name);"
+            }
+        },
+        "DB003": {
+            "description": "⚠️ Tables with too many columns can be hard to manage and optimize.",
+            "recommendation": "💡 Review the database normalization.",
+            "example": {
+                "bad": "CREATE TABLE users (id INT, name VARCHAR(255), age INT, address VARCHAR(255), phone VARCHAR(20), email VARCHAR(255), ...);",
+                "good": "CREATE TABLE users (id INT, name VARCHAR(255));"
+            }
+        },
+        "DB004": {
+            "description": "⚠️ Tables without primary keys can lead to data integrity and performance issues.",
+            "recommendation": "💡 Ensure each table has a primary key.",
+            "example": {
+                "bad": "CREATE TABLE users (name VARCHAR(255), age INT);",
+                "good": "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(255));"
+            }
+        },
+        "DB005": {
+            "description": "⚠️ Indexes that are never used can lead to wasted resources.",
+            "recommendation": "💡 Review and drop unnecessary indexes.",
+            "example": {
+                "bad": "CREATE INDEX idx_unused ON users(age);",
+                "good": "DROP INDEX idx_unused;"
+            }
+        },
+        "DB006": {
+            "description": "⚠️ Queries that can lead to deadlocks in the database.",
+            "recommendation": "💡 Review and optimize transactions to avoid deadlocks.",
+            "example": {
+                "bad": "BEGIN; UPDATE users SET name = 'John' WHERE id = 1; UPDATE orders SET amount = 100 WHERE user_id = 1; COMMIT;",
+                "good": "BEGIN; UPDATE orders SET amount = 100 WHERE user_id = 1; UPDATE users SET name = 'John' WHERE id = 1; COMMIT;"
+            }
+        },
+        "DB007": {
+            "description": "⚠️ Indexes on columns with few unique values may not be effective and can increase maintenance costs.",
+            "recommendation": "💡 Evaluate the need for indexes on low cardinality columns.",
+            "example": {
+                "bad": "CREATE INDEX idx_gender ON users(gender);",
+                "good": "DROP INDEX idx_gender;"
+            }
+        },
+        "DB008": {
+            "description": "⚠️ Selecting large text columns unnecessarily can impact performance.",
+            "recommendation": "💡 Select large text columns only when needed.",
+            "example": {
+                "bad": "SELECT bio FROM users;",
+                "good": "SELECT bio FROM users WHERE id = 1;"
+            }
+        },
+        "DB009": {
+            "description": "⚠️ Queries on large tables without LIMIT clauses can lead to long response times.",
+            "recommendation": "💡 Use LIMIT in queries on large tables to improve performance.",
+            "example": {
+                "bad": "SELECT * FROM users;",
+                "good": "SELECT * FROM users LIMIT 100;"
+            }
+        },
+        "DB010": {
+            "description": "⚠️ Very large tables without partitioning can affect performance.",
+            "recommendation": "💡 Implement partitioning on large tables for query efficiency.",
+            "example": {
+                "bad": "CREATE TABLE orders (id INT, amount DECIMAL(10, 2), order_date DATE);",
+                "good": "CREATE TABLE orders (id INT, amount DECIMAL(10, 2), order_date DATE) PARTITION BY RANGE (order_date);"
+            }
+        },
+        "DB011": {
+            "description": "⚠️ Temporary data that is not cleaned up can grow uncontrollably and affect performance.",
+            "recommendation": "💡 Implement cleanup mechanisms for temporary data.",
+            "example": {
+                "bad": "CREATE TEMP TABLE temp_data AS SELECT * FROM users;",
+                "good": "CREATE TEMP TABLE temp_data AS SELECT * FROM users; DROP TABLE temp_data;"
+            }
+        },
+        "DB012": {
+            "description": "⚠️ Lack of consistency in foreign key relationships can lead to referential integrity issues.",
+            "recommendation": "💡 Review and maintain consistent foreign key relationships.",
+            "example": {
+                "bad": "CREATE TABLE orders (id INT, user_id INT);",
+                "good": "CREATE TABLE orders (id INT, user_id INT, CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id));"
+            }
+        }
+    }
 }
