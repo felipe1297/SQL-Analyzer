@@ -1,8 +1,6 @@
-grammar postgreSqlGrammar;
+grammar PostgreSqlGrammar;
 
-options {
-	caseInsensitive = true;
-}
+initial: sql_stmt (sql_stmt)*;
 
 // Reglas Sintácticas
 sql_stmt:
@@ -122,7 +120,7 @@ with_clause: WITH cte (COMMA cte)*;
 cte: ID AS LPAREN select_stmt RPAREN;
 
 result_column:
-	STAR
+	table_reference
 	| table_reference DOT STAR
 	| table_reference DOT ID
 	| ID
@@ -187,7 +185,7 @@ expr:
 	| expr OR expr
 	| NOT expr
 	| arith_expr
-	| ID (EQ | NEQ | LT | LTE | GT | GTE) (STRING | NUMBER)
+	| (STRING | NUMBER | (ID (DOT ID)?)) (EQ | NEQ | LT | LTE | GT | GTE) (STRING | NUMBER | (ID (DOT ID)?))
 	| ID IS (NOT)? NULL
 	| ID LIKE STRING
 	| ID BETWEEN expr AND expr
@@ -214,109 +212,131 @@ function_call:
 function_arg: expr;
 
 // Reglas Léxicas
-fragment IdentifierStartChar:
-	[a-z_]
-	| [\u0100-\uD7FF\uE000-\uFFFF];
-fragment IdentifierChar: IdentifierStartChar | [0-9] | '$';
-ID: IdentifierStartChar IdentifierChar*;
 
-VARCHAR: 'VARCHAR';
-INT: 'INT';
-NUMERIC: 'NUMERIC';
-TEXT: 'TEXT';
-DATE: 'DATE';
-TIMESTAMP: 'TIMESTAMP';
-BOOL: 'BOOL';
-SERIAL: 'SERIAL';
-BIGSERIAL: 'BIGSERIAL';
-UUID: 'UUID';
-JSON: 'JSON';
-JSONB: 'JSONB';
-BYTEA: 'BYTEA';
-FLOAT: 'FLOAT';
-REAL: 'REAL';
-DOUBLE: 'DOUBLE';
-DECIMAL: 'DECIMAL';
-MONEY: 'MONEY';
-SMALLINT: 'SMALLINT';
-BIGINT: 'BIGINT';
-CHAR: 'CHAR';
-BIT: 'BIT';
-INTERVAL: 'INTERVAL';
-AUTOINCREMENT: 'AUTOINCREMENT';
+fragment A : [aA];
+fragment B : [bB];
+fragment C : [cC];
+fragment D : [dD];
+fragment E : [eE];
+fragment F : [fF];
+fragment G : [gG];
+fragment H : [hH];
+fragment I : [iI];
+fragment J : [jJ];
+fragment K : [kK];
+fragment L : [lL];
+fragment M : [mM];
+fragment N : [nN];
+fragment O : [oO];
+fragment P : [pP];
+fragment Q : [qQ];
+fragment R : [rR];
+fragment S : [sS];
+fragment T : [tT];
+fragment U : [uU];
+fragment V : [vV];
+fragment W : [wW];
+fragment X : [xX];
+fragment Y : [yY];
+fragment Z : [zZ];
 
-SELECT: 'SELECT';
-WITH: 'WITH';
-FROM: 'FROM';
-WHERE: 'WHERE';
-GROUP: 'GROUP';
-BY: 'BY';
-HAVING: 'HAVING';
-ORDER: 'ORDER';
-ASC: 'ASC';
-DESC: 'DESC';
-AND: 'AND';
-OR: 'OR';
-NOT: 'NOT';
-AS: 'AS';
-ON: 'ON';
-IS: 'IS';
-NULL: 'NULL';
-LIKE: 'LIKE';
-BETWEEN: 'BETWEEN';
-NATURAL: 'NATURAL';
-CASE: 'CASE';
-WHEN: 'WHEN';
-THEN: 'THEN';
-ELSE: 'ELSE';
-END: 'END';
-CREATE: 'CREATE';
-FUNCTION: 'FUNCTION';
-RETURNS: 'RETURNS';
-INNER: 'INNER';
-LEFT: 'LEFT';
-RIGHT: 'RIGHT';
-FULL: 'FULL';
-JOIN: 'JOIN';
-COUNT: 'COUNT';
-SUM: 'SUM';
-AVG: 'AVG';
-MIN: 'MIN';
-MAX: 'MAX';
-ARRAY_AGG: 'ARRAY_AGG';
-STRING_AGG: 'STRING_AGG';
-BOOL_AND: 'BOOL_AND';
-BOOL_OR: 'BOOL_OR';
-VAR_POP: 'VAR_POP';
-VAR_SAMP: 'VAR_SAMP';
-STDDEV_POP: 'STDDEV_POP';
-STDDEV_SAMP: 'STDDEV_SAMP';
-OFFSET: 'OFFSET';
-FETCH: 'FETCH';
-FIRST: 'FIRST';
-ROWS: 'ROWS';
-ONLY: 'ONLY';
-DISTINCT: 'DISTINCT';
+VARCHAR: V A R C H A R;
+INT: I N T;
+NUMERIC: N U M E R I C;
+TEXT: T E X T;
+DATE: D A T E;
+TIMESTAMP: T I M E S T A M P;
+BOOL: B O O L;
+SERIAL: S E R I A L;
+BIGSERIAL: B I G S E R I A L;
+UUID: U U I D;
+JSON: J S O N;
+JSONB: J S O N B;
+BYTEA: B Y T E A;
+FLOAT: F L O A T;
+REAL: R E A L;
+DOUBLE: D O U B L E;
+DECIMAL: D E C I M A L;
+MONEY: M O N E Y;
+SMALLINT: S M A L L I N T;
+BIGINT: B I G I N T;
+CHAR: C H A R;
+BIT: B I T;
+INTERVAL: I N T E R V A L;
+AUTOINCREMENT: A U T O I N C R E M E N T;
 
-TABLE: 'TABLE';
-UNIQUE: 'UNIQUE';
-PRIMARY: 'PRIMARY';
-KEY: 'KEY';
-DEFAULT: 'DEFAULT';
-FOREIGN: 'FOREIGN';
-REFERENCES: 'REFERENCES';
-INDEX: 'INDEX';
-DROP: 'DROP';
-ALTER: 'ALTER';
-RENAME: 'RENAME';
-CONSTRAINT: 'CONSTRAINT';
-TO: 'TO';
-ADD: 'ADD';
-COLUMN: 'COLUMN';
-DATABASE: 'DATABASE';
+SELECT: S E L E C T;
+WITH: W I T H;
+FROM: F R O M;
+WHERE: W H E R E;
+GROUP: G R O U P;
+BY: B Y;
+HAVING: H A V I N G;
+ORDER: O R D E R;
+ASC: A S C;
+DESC: D E S C;
+AND: A N D;
+OR: O R;
+NOT: N O T;
+AS: A S;
+ON: O N;
+IS: I S;
+NULL: N U L L;
+LIKE: L I K E;
+BETWEEN: B E T W E E N;
+NATURAL: N A T U R A L;
+CASE: C A S E;
+WHEN: W H E N;
+THEN: T H E N;
+ELSE: E L S E;
+END: E N D;
+CREATE: C R E A T E;
+FUNCTION: F U N C T I O N;
+RETURNS: R E T U R N S;
+INNER: I N N E R;
+LEFT: L E F T;
+RIGHT: R I G H T;
+FULL: F U L L;
+JOIN: J O I N;
+COUNT: C O U N T;
+SUM: S U M;
+AVG: A V G;
+MIN: M I N;
+MAX: M A X;
+ARRAY_AGG: A R R A Y '_' A G G;
+STRING_AGG: S T R I N G '_' A G G;
+BOOL_AND: B O O L '_' A N D;
+BOOL_OR: B O O L '_' O R;
+VAR_POP: V A R '_' P O P;
+VAR_SAMP: V A R '_' S A M P;
+STDDEV_POP: S T D D E V '_' P O P;
+STDDEV_SAMP: S T D D E V '_' S A M P;
+OFFSET: O F F S E T;
+FETCH: F E T C H;
+FIRST: F I R S T;
+ROWS: R O W S;
+ONLY: O N L Y;
+DISTINCT: D I S T I N C T;
 
-IF: 'IF';
-EXISTS: 'EXISTS';
+TABLE: T A B L E;
+UNIQUE: U N I Q U E;
+PRIMARY: P R I M A R Y;
+KEY: K E Y;
+DEFAULT: D E F A U L T;
+FOREIGN: F O R E I G N;
+REFERENCES: R E F E R E N C E S;
+INDEX: I N D E X;
+DROP: D R O P;
+ALTER: A L T E R;
+RENAME: R E N A M E;
+CONSTRAINT: C O N S T R A I N T;
+TO: T O;
+ADD: A D D;
+COLUMN: C O L U M N;
+DATABASE: D A T A B A S E;
+
+IF: I F;
+EXISTS: E X I S T S;
 
 STRING: '\'' ( ~'\'' | '\'\'')* '\'';
 NUMBER: [0-9]+;
@@ -337,13 +357,17 @@ PLUS: '+';
 MINUS: '-';
 SLASH: '/';
 
-INSERT: 'INSERT';
-INTO: 'INTO';
-VALUES: 'VALUES';
-UPDATE: 'UPDATE';
-SET: 'SET';
-DELETE: 'DELETE';
+INSERT: I N S E R T;
+INTO: I N T O;
+VALUES: V A L U E S;
+UPDATE: U P D A T E;
+SET: S E T;
+DELETE: D E L E T E;
 
 LINE_COMMENT: '--' ~[\r\n]* -> skip;
 BLOCK_COMMENT: '/*' .*? '*/' -> skip;
 WS: [ \t\r\n]+ -> skip;
+
+ID : (LETTER | '_' | '$') (LETTER | DIGIT | '_' | '$')* ;
+fragment LETTER : [a-zA-Z] ;
+fragment DIGIT : [0-9] ;

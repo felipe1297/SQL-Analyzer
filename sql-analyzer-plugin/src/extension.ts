@@ -109,12 +109,37 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
 
             resetDecorations(editor);
 
+            const totalLines = document.lineCount;
+            const lineOffset = -1;
+
             if (analysisResults.lexicalErrors.length > 0) {
-                const lexicalErrorDecorations = analysisResults.lexicalErrors.map((error: { line: number; message: string; }) => ({
-                    range: new vscode.Range(new vscode.Position(error.line, 0), new vscode.Position(error.line, document.lineAt(error.line).range.end.character)),
-                    hoverMessage: error.message
-                }));
-                console.log("Lexical Error Decorations:", lexicalErrorDecorations);
+                const lexicalErrorDecorations: vscode.DecorationOptions[] = [];
+                analysisResults.lexicalErrors.forEach((error: { line: number; message: string; }) => {
+                    console.log("Antes de crear el rango de decoración para errores léxicos");
+
+                    const adjustedLine = error.line + lineOffset;
+
+                    if (adjustedLine >= 0 && adjustedLine < totalLines) {
+                        try {
+                            const range = new vscode.Range(
+                                new vscode.Position(adjustedLine, 0),
+                                new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
+                            );
+                            console.log("Después de crear el rango de decoración para errores léxicos", range);
+                            
+                            lexicalErrorDecorations.push({
+                                range: range,
+                                hoverMessage: error.message
+                            });
+                        } catch (err) {
+                            console.error("Error al crear el rango de decoración para errores léxicos:", err);
+                        }
+                    } else {
+                        console.warn(`Línea de error léxico fuera de rango: ${adjustedLine}`);
+                    }
+
+                    console.log("Después de la lógica de decoración para errores léxicos");
+                });
                 editor.setDecorations(errorDecorationType, lexicalErrorDecorations);
 
                 vscode.window.showErrorMessage(`❌ SQL analysis found lexical errors. Please correct them and try again.`);
@@ -122,22 +147,66 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             }
 
             if (analysisResults.syntaxErrors.length > 0) {
-                const syntaxErrorDecorations = analysisResults.syntaxErrors.map((error: { line: number; message: string; }) => ({
-                    range: new vscode.Range(new vscode.Position(error.line, 0), new vscode.Position(error.line, document.lineAt(error.line).range.end.character)),
-                    hoverMessage: error.message
-                }));
-                console.log("Syntax Error Decorations:", syntaxErrorDecorations);
+                const syntaxErrorDecorations: vscode.DecorationOptions[] = [];
+                analysisResults.syntaxErrors.forEach((error: { line: number; message: string; }) => {
+                    console.log("Antes de crear el rango de decoración para errores sintácticos");
+
+                    const adjustedLine = error.line + lineOffset;
+
+                    if (adjustedLine >= 0 && adjustedLine < totalLines) {
+                        try {
+                            const range = new vscode.Range(
+                                new vscode.Position(adjustedLine, 0),
+                                new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
+                            );
+                            console.log("Después de crear el rango de decoración para errores sintácticos", range);
+                            
+                            syntaxErrorDecorations.push({
+                                range: range,
+                                hoverMessage: error.message
+                            });
+                        } catch (err) {
+                            console.error("Error al crear el rango de decoración para errores sintácticos:", err);
+                        }
+                    } else {
+                        console.warn(`Línea de error sintáctico fuera de rango: ${adjustedLine}`);
+                    }
+
+                    console.log("Después de la lógica de decoración para errores sintácticos");
+                });
                 editor.setDecorations(errorDecorationType, syntaxErrorDecorations);
 
                 vscode.window.showErrorMessage(`❌ SQL analysis found syntax errors. Please correct them and try again.`);
                 return;
             }
 
-            const codeSmellDecorations = analysisResults.codeSmells.map((smell: { line: number; message: string; }) => ({
-                range: new vscode.Range(new vscode.Position(smell.line, 0), new vscode.Position(smell.line, document.lineAt(smell.line).range.end.character)),
-                hoverMessage: smell.message
-            }));
-            console.log("Code Smell Decorations:", codeSmellDecorations);
+            const codeSmellDecorations: vscode.DecorationOptions[] = [];
+            analysisResults.codeSmells.forEach((smell: { line: number; message: string; }) => {
+                console.log("Antes de crear el rango de decoración para code smells");
+
+                const adjustedLine = smell.line + lineOffset;
+
+                if (adjustedLine >= 0 && adjustedLine < totalLines) {
+                    try {
+                        const range = new vscode.Range(
+                            new vscode.Position(adjustedLine, 0),
+                            new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
+                        );
+                        console.log("Después de crear el rango de decoración para code smells", range);
+                        
+                        codeSmellDecorations.push({
+                            range: range,
+                            hoverMessage: smell.message
+                        });
+                    } catch (err) {
+                        console.error("Error al crear el rango de decoración para code smells:", err);
+                    }
+                } else {
+                    console.warn(`Línea de code smell fuera de rango: ${adjustedLine}`);
+                }
+
+                console.log("Después de la lógica de decoración para code smells");
+            });
             editor.setDecorations(codeSmellDecorationType, codeSmellDecorations);
 
             vscode.window.showInformationMessage(`✅ Analysis completed.`);
@@ -145,6 +214,8 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             if (showDiagram) {
                 createWebviewPanel(analysisResults.diagram, analysisResults.codeSmells);
             }
+        } else {
+            console.log("No active editor found.");
         }
     });
 }
