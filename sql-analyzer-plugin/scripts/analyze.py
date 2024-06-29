@@ -33,6 +33,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         # Detect nested subqueries in select_stmt
         self._detect_nested_subqueries(ctx)
 
+        # Detect JOIN without condition
+        self._detect_cartesian_product(ctx)
+
         return self.visitChildren(ctx)
 
     def _detect_nested_subqueries(self, ctx):
@@ -67,6 +70,20 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
             "recommendation": recommendation,
             "example": example
         })
+
+    def _detect_cartesian_product(self, ctx):
+        if len(ctx.table_reference()) > 1 and not ctx.join_clause():
+            code = "NDB003"
+            message = self.messages[self.no_db_access][code]["description"]
+            recommendation = self.messages[self.no_db_access][code]["recommendation"]
+            example = self.messages[self.no_db_access][code]["example"]
+            self.smells.append({
+                "line": ctx.start.line,
+                "code": code,
+                "message": message,
+                "recommendation": recommendation,
+                "example": example
+            })
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):

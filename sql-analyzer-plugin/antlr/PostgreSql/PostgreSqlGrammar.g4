@@ -18,7 +18,7 @@ sql_stmt:
 select_stmt: (WITH with_clause)? SELECT (DISTINCT)? (
 		STAR
 		| (result_column (COMMA result_column)*)
-	) FROM table_reference (join_clause)* (WHERE expr)? (
+	) FROM table_reference (COMMA table_reference)* (join_clause)* (WHERE expr)? (
 		group_by_clause
 	)? (order_by_clause)?;
 

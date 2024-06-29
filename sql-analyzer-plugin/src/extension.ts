@@ -232,7 +232,7 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
 
     const codeSmellsHTML = codeSmells.map(item => item.smells.map(smell => `
         <div class="code-smell">
-            <p class="message">Line ${smell.line + 1}: ${smell.message}</p>
+            <p class="message">Line ${smell.line}: ${smell.message}</p>
             <p class="recommendation">${smell.recommendation}</p>
             <div class="example">
                 <p><strong>Example:</strong></p>
