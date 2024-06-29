@@ -4,12 +4,12 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 
 const errorDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: 'rgba(255,0,0,0.3)',
+    backgroundColor: 'rgba(255,0,0,0.2)',
     isWholeLine: true
 });
 
 const codeSmellDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: 'rgba(255,255,0,0.3)',
+    backgroundColor: 'rgba(255,255,0,0.2)',
     isWholeLine: true
 });
 
@@ -115,7 +115,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             if (analysisResults.lexicalErrors.length > 0) {
                 const lexicalErrorDecorations: vscode.DecorationOptions[] = [];
                 analysisResults.lexicalErrors.forEach((error: { line: number; message: string; }) => {
-                    console.log("Antes de crear el rango de decoración para errores léxicos");
+                    console.log("Before creating decoration range for lexical errors");
 
                     const adjustedLine = error.line + lineOffset;
 
@@ -125,20 +125,20 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                                 new vscode.Position(adjustedLine, 0),
                                 new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                             );
-                            console.log("Después de crear el rango de decoración para errores léxicos", range);
+                            console.log("After creating decoration range for lexical errors", range);
                             
                             lexicalErrorDecorations.push({
                                 range: range,
                                 hoverMessage: error.message
                             });
                         } catch (err) {
-                            console.error("Error al crear el rango de decoración para errores léxicos:", err);
+                            console.error("Error creating decoration range for lexical errors:", err);
                         }
                     } else {
-                        console.warn(`Línea de error léxico fuera de rango: ${adjustedLine}`);
+                        console.warn(`Lexical error line out of range: ${adjustedLine}`);
                     }
 
-                    console.log("Después de la lógica de decoración para errores léxicos");
+                    console.log("After lexical error decoration logic");
                 });
                 editor.setDecorations(errorDecorationType, lexicalErrorDecorations);
 
@@ -149,7 +149,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             if (analysisResults.syntaxErrors.length > 0) {
                 const syntaxErrorDecorations: vscode.DecorationOptions[] = [];
                 analysisResults.syntaxErrors.forEach((error: { line: number; message: string; }) => {
-                    console.log("Antes de crear el rango de decoración para errores sintácticos");
+                    console.log("Before creating decoration range for syntax errors");
 
                     const adjustedLine = error.line + lineOffset;
 
@@ -159,20 +159,20 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                                 new vscode.Position(adjustedLine, 0),
                                 new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                             );
-                            console.log("Después de crear el rango de decoración para errores sintácticos", range);
+                            console.log("After creating decoration range for syntax errors", range);
                             
                             syntaxErrorDecorations.push({
                                 range: range,
                                 hoverMessage: error.message
                             });
                         } catch (err) {
-                            console.error("Error al crear el rango de decoración para errores sintácticos:", err);
+                            console.error("Error creating decoration range for syntax errors:", err);
                         }
                     } else {
-                        console.warn(`Línea de error sintáctico fuera de rango: ${adjustedLine}`);
+                        console.warn(`Syntax error line out of range: ${adjustedLine}`);
                     }
 
-                    console.log("Después de la lógica de decoración para errores sintácticos");
+                    console.log("After syntax error decoration logic");
                 });
                 editor.setDecorations(errorDecorationType, syntaxErrorDecorations);
 
@@ -182,7 +182,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
 
             const codeSmellDecorations: vscode.DecorationOptions[] = [];
             analysisResults.codeSmells.forEach((smell: { line: number; message: string; }) => {
-                console.log("Antes de crear el rango de decoración para code smells");
+                console.log("Before creating decoration range for code smells");
 
                 const adjustedLine = smell.line + lineOffset;
 
@@ -192,20 +192,20 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                             new vscode.Position(adjustedLine, 0),
                             new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                         );
-                        console.log("Después de crear el rango de decoración para code smells", range);
+                        console.log("After creating decoration range for code smells", range);
                         
                         codeSmellDecorations.push({
                             range: range,
                             hoverMessage: smell.message
                         });
                     } catch (err) {
-                        console.error("Error al crear el rango de decoración para code smells:", err);
+                        console.error("Error creating decoration range for code smells:", err);
                     }
                 } else {
-                    console.warn(`Línea de code smell fuera de rango: ${adjustedLine}`);
+                    console.warn(`Code smell line out of range: ${adjustedLine}`);
                 }
 
-                console.log("Después de la lógica de decoración para code smells");
+                console.log("After code smell decoration logic");
             });
             editor.setDecorations(codeSmellDecorationType, codeSmellDecorations);
 
