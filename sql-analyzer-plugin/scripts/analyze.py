@@ -42,6 +42,18 @@ class WhereClauseVisitor(PostgreSqlGrammarVisitor):
                 "recommendation": recommendation,
                 "example": example
             })
+        elif self._is_excessive_or(ctx):
+            code = "NDB007"
+            message = self.messages["no_db_access"][code]["description"]
+            recommendation = self.messages["no_db_access"][code]["recommendation"]
+            example = self.messages["no_db_access"][code]["example"]
+            self.smells.append({
+                "line": ctx.start.line,
+                "code": code,
+                "message": message,
+                "recommendation": recommendation,
+                "example": example
+            })
         return self.visitChildren(ctx)
 
     def _is_trivial_condition(self, ctx):
@@ -50,6 +62,24 @@ class WhereClauseVisitor(PostgreSqlGrammarVisitor):
             op = ctx.getChild(1).getText()
             right = ctx.getChild(2).getText()
             if (left == right and op in ['=', '!=']) or (left in ['1', '0'] and right in ['1', '0']):
+                return True
+        return False
+
+    def _is_excessive_or(self, ctx):
+        if ctx.getChildCount() == 3:
+            left = ctx.getChild(0)
+            op = ctx.getChild(1).getText()
+            right = ctx.getChild(2)
+            if op == "OR" and (self._is_simple_comparison(left) or self._is_simple_comparison(right)):
+                return True
+        return False
+
+    def _is_simple_comparison(self, ctx):
+        if ctx.getChildCount() == 3:
+            left = ctx.getChild(0).getText()
+            op = ctx.getChild(1).getText()
+            right = ctx.getChild(2).getText()
+            if op in ["=", "!=", "<", ">", "<=", ">="] and left.isidentifier() and (right.isidentifier() or right.isnumeric() or right.startswith("'")):
                 return True
         return False
 
