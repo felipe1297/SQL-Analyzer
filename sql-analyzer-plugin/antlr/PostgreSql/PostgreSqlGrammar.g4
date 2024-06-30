@@ -122,12 +122,12 @@ with_clause: WITH cte (COMMA cte)*;
 cte: ID AS LPAREN select_stmt RPAREN;
 
 result_column:
-	table_reference
+	(table_reference
 	| table_reference DOT STAR
 	| table_reference DOT ID
 	| ID
 	| agg_func
-	| ID LPAREN RPAREN;
+	| ID LPAREN RPAREN) (alias)?;
 
 join_clause: standard_join | natural_join;
 

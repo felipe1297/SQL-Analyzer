@@ -6,7 +6,7 @@ from antlr4.error.ErrorListener import ErrorListener
 from antlr.PostgreSql.PostgreSqlGrammarLexer import PostgreSqlGrammarLexer
 from antlr.PostgreSql.PostgreSqlGrammarParser import PostgreSqlGrammarParser
 from antlr.PostgreSql.PostgreSqlGrammarVisitor import PostgreSqlGrammarVisitor
-
+from difflib import SequenceMatcher
 
 class WhereClauseVisitor(PostgreSqlGrammarVisitor):
 
@@ -90,6 +90,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         self.messages = messages
         self.no_db_access = "no_db_access"
         self.db_access = "db_access"
+        self.levenshtein_similarity_ratio = 0.6
 
     def visitSelect_stmt(self, ctx):
         # Detect SELECT *
@@ -123,6 +124,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
 
         # Detect OFFSET without LIMIT
         self._detect_offset_without_limit(ctx)
+
+        # Detect unclear or unnecessary aliases
+        self._detect_unclear_aliases(ctx)
 
         return self.visitChildren(ctx)
 
@@ -245,6 +249,79 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 "recommendation": recommendation,
                 "example": example
             })
+    
+    # Levenshtein similarity
+    def _detect_unclear_aliases(self, ctx):
+        def similar(a, b):
+            return SequenceMatcher(None, a, b).ratio()
+        for child in ctx.getChildren():
+            if isinstance(child, PostgreSqlGrammarParser.Table_referenceContext):
+                table_name = None
+                alias = None
+                for grandchild in child.getChildren():
+                    if isinstance(grandchild, PostgreSqlGrammarParser.Table_nameContext):
+                        table_name = grandchild.getText()
+                    elif isinstance(grandchild, PostgreSqlGrammarParser.AliasContext):
+                        if grandchild.getChildCount() == 2 and grandchild.getChild(0).getText().upper() == "AS":
+                            alias = grandchild.getChild(1).getText()
+                        else:
+                            alias = grandchild.getText()
+
+                if table_name and alias:
+                    similarity_ratio = similar(alias, table_name)
+                    if similarity_ratio < self.levenshtein_similarity_ratio:
+                        code = "NDB010"
+                        message = self.messages[self.no_db_access][code]["description"]
+                        recommendation = self.messages[self.no_db_access][code]["recommendation"]
+                        example = self.messages[self.no_db_access][code]["example"]
+                        self.smells.append({
+                            "line": ctx.start.line,
+                            "code": code,
+                            "message": message,
+                            "recommendation": recommendation,
+                            "example": example
+                        })
+
+        for child in ctx.getChildren():
+            if isinstance(child, PostgreSqlGrammarParser.Result_columnContext):
+                original_text = None
+                alias = None
+
+                if child.getChildCount() == 2:
+                    # Handle ID ID
+                    original_text = child.getChild(0).getText()
+                    alias = child.getChild(1).getText()
+                elif child.getChildCount() == 3 and child.getChild(1).getText().upper() == "AS":
+                    # Handle ID AS ID
+                    original_text = child.getChild(0).getText()
+                    alias = child.getChild(2).getText()
+                elif child.getChildCount() == 4 and child.getChild(1).getText() == ".":
+                    # Handle ID DOT ID ID
+                    original_text = child.getChild(2).getText()
+                    alias = child.getChild(3).getText()
+                elif child.getChildCount() == 5 and child.getChild(3).getText().upper() == "AS":
+                    # Handle ID DOT ID AS ID
+                    original_text = child.getChild(2).getText()
+                    alias = child.getChild(4).getText()
+                elif child.getChildCount() == 3 and child.getChild(1).getText() == ".":
+                    # Handle ID DOT ID
+                    original_text = child.getChild(2).getText()
+
+                if original_text and alias:
+                    similarity_ratio = similar(alias, original_text)
+                    if similarity_ratio < self.levenshtein_similarity_ratio:
+                        code = "NDB010"
+                        message = self.messages[self.no_db_access][code]["description"]
+                        recommendation = self.messages[self.no_db_access][code]["recommendation"]
+                        example = self.messages[self.no_db_access][code]["example"]
+                        self.smells.append({
+                            "line": ctx.start.line,
+                            "code": code,
+                            "message": message,
+                            "recommendation": recommendation,
+                            "example": example
+                        })
+
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):

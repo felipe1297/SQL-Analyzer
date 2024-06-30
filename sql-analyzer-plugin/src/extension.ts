@@ -126,7 +126,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                                 new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                             );
                             console.log("After creating decoration range for lexical errors", range);
-                            
+
                             lexicalErrorDecorations.push({
                                 range: range,
                                 hoverMessage: error.message
@@ -160,7 +160,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                                 new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                             );
                             console.log("After creating decoration range for syntax errors", range);
-                            
+
                             syntaxErrorDecorations.push({
                                 range: range,
                                 hoverMessage: error.message
@@ -193,7 +193,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                             new vscode.Position(adjustedLine, document.lineAt(adjustedLine).range.end.character)
                         );
                         console.log("After creating decoration range for code smells", range);
-                        
+
                         codeSmellDecorations.push({
                             range: range,
                             hoverMessage: `${smell.message}\n`
@@ -357,7 +357,7 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    
+
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     const realTimeAnalysis = config.get<boolean>('realTimeAnalysis', false);
     const validateWithDB = config.get<boolean>('validateWithDB', true); // Add this configuration option
@@ -445,4 +445,4 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(showCredentialsDisposable);
 }
 
-export function deactivate() {}
+export function deactivate() { }
