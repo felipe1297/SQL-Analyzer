@@ -188,13 +188,17 @@ expr:
 	| expr OR expr
 	| NOT expr
 	| arith_expr
-	| (STRING | NUMBER | (ID (DOT ID)?)) (EQ | NEQ | LT | LTE | GT | GTE) (STRING | NUMBER | (ID (DOT ID)?))
+	| comparatorExpr (EQ | NEQ | LT | LTE | GT | GTE) comparatorExpr
 	| ID IS (NOT)? NULL
 	| ID LIKE STRING
 	| ID BETWEEN expr AND expr
 	| LPAREN select_stmt RPAREN
 	| case_expr
-	| function_call ((EQ | NEQ | LT | LTE | GT | GTE) (expr | STRING | NUMBER | (ID (DOT ID)?)))?;
+	| comparatorExpr ((EQ | NEQ | LT | LTE | GT | GTE) (expr | STRING | NUMBER | (ID (DOT ID)?)))?;
+
+comparatorExpr:
+    (STRING | NUMBER | (ID (DOT ID)?))
+    | function_call;
 
 arith_expr:
 	arith_expr PLUS arith_expr

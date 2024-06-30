@@ -4,6 +4,7 @@ import os
 from antlr4 import *
 from difflib import SequenceMatcher
 import psycopg2
+from psycopg2 import sql
 from antlr4.error.ErrorListener import ErrorListener
 from antlr.PostgreSql.PostgreSqlGrammarLexer import PostgreSqlGrammarLexer
 from antlr.PostgreSql.PostgreSqlGrammarParser import PostgreSqlGrammarParser
@@ -92,6 +93,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         self.no_db_access = "no_db_access"
         self.db_access = "db_access"
         self.levenshtein_similarity_ratio = 0.6
+        self.dbMessage = False
         self.db_credentials = db_credentials
         self.db_connection = None
 
@@ -99,10 +101,15 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
             try:
                 self.db_connection = self._connect_to_db()
             except Exception as e:
-                print(f"Error connecting to database: {e}")
                 self.db_connection = None
 
     def _connect_to_db(self):
+
+        if None in (self.db_credentials["host"], 
+                    self.db_credentials["port"], self.db_credentials["user"], 
+                    self.db_credentials["password"], self.db_credentials["database"]):
+            return
+
         host = self.db_credentials["host"]
         port = self.db_credentials["port"]
         user = self.db_credentials["user"]
@@ -119,6 +126,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         return conn
     
     def visitSelect_stmt(self, ctx):
+        table_references = self._extract_table_aliases(ctx)
         # Detect SELECT *
         if ctx.STAR():
             code = "NDB001"
@@ -155,11 +163,33 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         self._detect_unclear_aliases(ctx)
 
         if self.db_connection:
-            self._detect_missing_indexes_on_joins(ctx)
+            # self._detect_missing_indexes_on_joins(ctx, table_references)
+            pass
         else:
             self._add_missing_db_connection_smell()
 
         return self.visitChildren(ctx)
+
+    def _extract_table_aliases(self, ctx):
+        table_aliases = {}
+
+        def traverse_table_references(ctx):
+            if isinstance(ctx, PostgreSqlGrammarParser.Table_referenceContext):
+                table_name = None
+                alias = None
+                for child in ctx.getChildren():
+                    if isinstance(child, PostgreSqlGrammarParser.Table_nameContext):
+                        table_name = child.getText()
+                    elif isinstance(child, PostgreSqlGrammarParser.AliasContext):
+                        alias = child.getChild(1).getText() if child.getChildCount() == 2 else child.getChild(0).getText()
+                if table_name:
+                    table_aliases[alias or table_name] = table_name
+
+            for i in range(ctx.getChildCount()):
+                traverse_table_references(ctx.getChild(i))
+
+        traverse_table_references(ctx)
+        return table_aliases
 
     def _detect_nested_subqueries(self, ctx):
         # Check within select_stmt for nested select_stmt
@@ -354,22 +384,169 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                         })
 
     def _add_missing_db_connection_smell(self):
-        code = "DB_CONN"
-        message = "Database connection is not available. Database-specific analyses are disabled."
-        self.smells.append({
-            "line": 0,
-            "code": code,
-            "message": message,
-            "recommendation": "",
-            "example": ""
-        })
+        if not self.dbMessage:
+            self.dbMessage = True
+            code = "DB_CONN"
+            message = "Database connection is not available. Database-specific analyses are disabled."
+            self.smells.append({
+                "line": 0,
+                "code": code,
+                "message": message,
+                "recommendation": "",
+                "example": ""
+            })
 
-    def _detect_missing_indexes_on_joins(self, ctx):
+    def visitStandard_join(self, ctx):
+        table_references = self._extract_table_aliases(ctx)
+        on_expr = ctx.expr()
+        self._analyze_on_expression(on_expr, table_references)
+
+        return self.visitChildren(ctx)
+
+    def _extract_table_aliases(self, ctx):
+        table_aliases = {}
+
+        def traverse_table_references(ctx):
+            if isinstance(ctx, PostgreSqlGrammarParser.Table_referenceContext):
+                table_name = None
+                alias = None
+                for child in ctx.getChildren():
+                    if isinstance(child, PostgreSqlGrammarParser.Table_nameContext):
+                        table_name = child.getText()
+                    elif isinstance(child, PostgreSqlGrammarParser.AliasContext):
+                        alias = child.getChild(1).getText() if child.getChildCount() == 2 else child.getChild(0).getText()
+                if table_name:
+                    table_aliases[alias or table_name] = table_name
+
+            for i in range(ctx.getChildCount()):
+                traverse_table_references(ctx.getChild(i))
+
+        traverse_table_references(ctx)
+        return table_aliases
+
+    def _analyze_on_expression(self, ctx, table_references):
+        if ctx.getChildCount() == 3:
+            left = ctx.getChild(0)
+            op = ctx.getChild(1).getText()
+            right = ctx.getChild(2)
+
+            if op.upper() in ["AND", "OR"]:
+                self._analyze_on_expression(left, table_references)
+                self._analyze_on_expression(right, table_references)
+            else:
+                self._process_comparison(left, op, right, table_references)
+
+        elif ctx.getChildCount() > 1:
+            for i in range(ctx.getChildCount()):
+                self._analyze_on_expression(ctx.getChild(i), table_references)
+
+    def _process_comparison(self, left, op, right, table_references):
+        if self._is_simple_column(left) and self._is_simple_column(right):
+            left_table, left_column = self._resolve_column(left, table_references)
+            right_table, right_column = self._resolve_column(right, table_references)
+
+            if left_table and left_column:
+                self._check_index(left_table, left_column, left.start.line)
+
+            if right_table and right_column:
+                self._check_index(right_table, right_column, right.start.line)
+
+        elif self._is_function_call(left) or self._is_function_call(right):
+            if self._is_simple_column(left):
+                left_table, left_column = self._resolve_column(left, table_references)
+                if left_table and left_column:
+                    self._check_index(left_table, left_column, left.start.line)
+
+            if self._is_simple_column(right):
+                right_table, right_column = self._resolve_column(right, table_references)
+                if right_table and right_column:
+                    self._check_index(right_table, right_column, right.start.line)
+
+    def _is_simple_column(self, ctx):
+        if isinstance(ctx, PostgreSqlGrammarParser.ComparatorExprContext):
+            if ctx.getChildCount() == 3:
+                child0 = ctx.getChild(0)
+                child1 = ctx.getChild(1)
+                child2 = ctx.getChild(2)
+                if isinstance(child0, TerminalNode) and isinstance(child1, TerminalNode) and isinstance(child2, TerminalNode):
+                    if child0.getSymbol().type == PostgreSqlGrammarParser.ID and \
+                    child1.getSymbol().type == PostgreSqlGrammarParser.DOT and \
+                    child2.getSymbol().type == PostgreSqlGrammarParser.ID:
+                        return True
+        elif isinstance(ctx, TerminalNode):
+            if ctx.getSymbol().type == PostgreSqlGrammarParser.ID:
+                return True
+        return False
+    
+    def _is_function_call(self, ctx):
+        if isinstance(ctx, PostgreSqlGrammarParser.Function_callContext):
+            if len(ctx.getChildCount()) >= 3:
+                third_child = ctx.children[2]
+                if isinstance(third_child, PostgreSqlGrammarParser.ExpressionContext):
+                    return self._is_simple_column(third_child) or self._is_function_call(third_child)
+                elif isinstance(third_child, PostgreSqlGrammarParser.Function_callContext):
+                    return self._is_function_call(third_child)
+            return False
+        return False
+
+    def _resolve_column(self, ctx, table_references):
+        if ctx.getChildCount() == 1:
+            column = ctx.getText()
+            table = self._find_table_by_column(column, table_references)
+            return table, column
+        elif ctx.getChildCount() == 3 and ctx.getChild(1).getText() == ".":
+            table = ctx.getChild(0).getText()
+            column = ctx.getChild(2).getText()
+            return table_references.get(table, table), column
+        elif isinstance(ctx, PostgreSqlGrammarParser.Function_callContext):
+            if len(ctx.children) >= 3:
+                third_child = ctx.children[2]
+                if isinstance(third_child, PostgreSqlGrammarParser.ExpressionContext):
+                    return self._resolve_column(third_child, table_references)
+                elif isinstance(third_child, PostgreSqlGrammarParser.Function_callContext):
+                    return self._resolve_column(third_child, table_references)
+        return None, None
+
+    def _find_table_by_column(self, column, table_references):
         if self.db_connection:
-            # Implementation for detecting missing indexes on JOIN columns
-            # This is a placeholder and should be replaced with actual logic
-            pass
+            for table in table_references.values():
+                if self._column_exists_in_table(column, table):
+                    return table
+        return None
 
+    def _column_exists_in_table(self, column, table):
+        query = sql.SQL("SELECT 1 FROM information_schema.columns WHERE table_name = {table} AND column_name = {column}").format(
+            table=sql.Literal(table),
+            column=sql.Literal(column)
+        )
+        cursor = self.db_connection.cursor()
+        cursor.execute(query)
+        result = cursor.fetchone()
+        cursor.close()
+        return result is not None
+
+    def _check_index(self, table, column, line):
+        if self.db_connection:
+            query = sql.SQL("SELECT 1 FROM pg_indexes WHERE tablename = {table} AND indexdef LIKE {pattern}").format(
+                table=sql.Literal(table),
+                pattern=sql.Literal(f"%({column})%")
+            )
+            cursor = self.db_connection.cursor()
+            cursor.execute(query)
+            result = cursor.fetchone()
+            cursor.close()
+            if not result:
+                code = "DB001"
+                message = self.messages["db_access"][code]["description"]
+                recommendation = self.messages["db_access"][code]["recommendation"]
+                example = self.messages["db_access"][code]["example"]
+                self.smells.append({
+                    "line": line,
+                    "code": code,
+                    "message": message,
+                    "recommendation": recommendation,
+                    "example": example
+                })
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
@@ -436,43 +613,49 @@ def read_json_file(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
-# if __name__ == "__main__":
-#     script_dir = os.path.dirname(os.path.realpath(__file__))
-#     messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
-
-#     messages = read_json_file(messages_path)
-
-#     query = sys.argv[1]
-#     db_credentials = None
-#     if len(sys.argv) > 2:
-#         db_credentials = sys.argv[2:7]
-
-#     result = analyze_sql(query, messages, db_credentials)
-#     print(result)
-
-
-
-def read_sql_file(file_path):
-    with open(file_path, 'r') as file:
-        return file.read()
-    
 if __name__ == "__main__":
-    # Ajustar la ruta para subir dos niveles en el directorio
     script_dir = os.path.dirname(os.path.realpath(__file__))
     messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
+
     messages = read_json_file(messages_path)
 
-    sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Ruta al archivo de consultas SQL
-    query = read_sql_file(sql_file)
-
-    # Datos de la base de datos para pruebas
-    db_credentials = {
-        "host": "localhost",
-        "port": 5433,
-        "user": "testuser",
-        "password": "testpassword",
-        "database": "testdb"
-    }
+    query = sys.argv[1]
+    db_credentials = None
+    if len(sys.argv) > 2:
+        db_credentials = {
+            "host": sys.argv[2],
+            "port": sys.argv[3],
+            "user": sys.argv[4],
+            "password": sys.argv[5],
+            "database": sys.argv[6]
+        }
 
     result = analyze_sql(query, messages, db_credentials)
     print(result)
+
+
+
+# def read_sql_file(file_path):
+#     with open(file_path, 'r') as file:
+#         return file.read()
+    
+# if __name__ == "__main__":
+#     # Ajustar la ruta para subir dos niveles en el directorio
+#     script_dir = os.path.dirname(os.path.realpath(__file__))
+#     messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
+#     messages = read_json_file(messages_path)
+
+#     sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Ruta al archivo de consultas SQL
+#     query = read_sql_file(sql_file)
+
+#     # Datos de la base de datos para pruebas
+#     db_credentials = {
+#         "host": "localhost",
+#         "port": 5433,
+#         "user": "testuser",
+#         "password": "testpassword",
+#         "database": "testdb"
+#     }
+
+#     result = analyze_sql(query, messages, db_credentials)
+#     print(result)

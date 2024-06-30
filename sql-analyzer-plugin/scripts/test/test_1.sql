@@ -1,1 +1,3 @@
-SELECT u.name as its_seems_so_different FROM users as its_seems_so_different;
+SELECT c.name, j.name
+FROM characters c
+INNER JOIN character_jutsu cj ON ida.ida = cj.character_id and ida.ida = cj.character_id;

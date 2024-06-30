@@ -377,6 +377,15 @@ class PostgreSqlGrammarListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by PostgreSqlGrammarParser#comparatorExpr.
+    def enterComparatorExpr(self, ctx:PostgreSqlGrammarParser.ComparatorExprContext):
+        pass
+
+    # Exit a parse tree produced by PostgreSqlGrammarParser#comparatorExpr.
+    def exitComparatorExpr(self, ctx:PostgreSqlGrammarParser.ComparatorExprContext):
+        pass
+
+
     # Enter a parse tree produced by PostgreSqlGrammarParser#arith_expr.
     def enterArith_expr(self, ctx:PostgreSqlGrammarParser.Arith_exprContext):
         pass

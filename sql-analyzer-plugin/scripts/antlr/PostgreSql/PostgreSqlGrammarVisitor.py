@@ -214,6 +214,11 @@ class PostgreSqlGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by PostgreSqlGrammarParser#comparatorExpr.
+    def visitComparatorExpr(self, ctx:PostgreSqlGrammarParser.ComparatorExprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by PostgreSqlGrammarParser#arith_expr.
     def visitArith_expr(self, ctx:PostgreSqlGrammarParser.Arith_exprContext):
         return self.visitChildren(ctx)
