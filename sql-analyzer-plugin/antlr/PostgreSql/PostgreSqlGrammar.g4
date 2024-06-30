@@ -192,7 +192,7 @@ expr:
 	| ID BETWEEN expr AND expr
 	| LPAREN select_stmt RPAREN
 	| case_expr
-	| function_call;
+	| function_call ((EQ | NEQ | LT | LTE | GT | GTE) (expr | STRING | NUMBER | (ID (DOT ID)?)))?;
 
 arith_expr:
 	arith_expr PLUS arith_expr
@@ -208,7 +208,28 @@ case_expr: CASE when_clause+ (ELSE (expr | NULL))? END;
 when_clause: WHEN expr THEN expr;
 
 function_call:
-	ID LPAREN (function_arg (COMMA function_arg)*)? RPAREN;
+	ID LPAREN (function_arg (COMMA function_arg)*)? RPAREN
+        | LEN LPAREN expr RPAREN
+        | UPPER LPAREN expr RPAREN
+        | LOWER LPAREN expr RPAREN
+        | SUBSTRING LPAREN expr COMMA INT COMMA INT RPAREN
+        | ABS LPAREN expr RPAREN
+        | CEILING LPAREN expr RPAREN
+        | FLOOR LPAREN expr RPAREN
+        | ROUND LPAREN expr COMMA INT RPAREN
+        | YEAR LPAREN expr RPAREN
+        | MONTH LPAREN expr RPAREN
+        | DAY LPAREN expr RPAREN
+        | GETDATE LPAREN RPAREN
+        | DATEADD LPAREN expr COMMA INT COMMA expr RPAREN
+        | DATEDIFF LPAREN expr COMMA expr COMMA expr RPAREN
+        | CAST LPAREN expr AS data_type RPAREN
+        | CONVERT LPAREN data_type COMMA expr RPAREN
+        | SUM LPAREN expr RPAREN
+        | AVG LPAREN expr RPAREN
+        | COUNT LPAREN expr RPAREN
+        | MIN LPAREN expr RPAREN
+        | MAX LPAREN expr RPAREN;
 
 function_arg: expr;
 
@@ -335,6 +356,30 @@ TO: T O;
 ADD: A D D;
 COLUMN: C O L U M N;
 DATABASE: D A T A B A S E;
+
+// Funciones de cadena
+LEN: L E N;
+UPPER: U P P E R;
+LOWER: L O W E R;
+SUBSTRING: S U B S T R I N G;
+
+// Funciones numéricas
+ABS: A B S;
+CEILING: C E I L I N G;
+FLOOR: F L O O R;
+ROUND: R O U N D;
+
+// Funciones de fecha y hora
+YEAR: Y E A R;
+MONTH: M O N T H;
+DAY: D A Y;
+GETDATE: G E T D A T E;
+DATEADD: D A T E A D D;
+DATEDIFF: D A T E D I F F;
+
+// Funciones de conversión
+CAST: C A S T;
+CONVERT: C O N V E R T;
 
 IF: I F;
 EXISTS: E X I S T S;

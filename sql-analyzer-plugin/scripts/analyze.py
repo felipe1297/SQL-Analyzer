@@ -7,6 +7,28 @@ from antlr.PostgreSql.PostgreSqlGrammarLexer import PostgreSqlGrammarLexer
 from antlr.PostgreSql.PostgreSqlGrammarParser import PostgreSqlGrammarParser
 from antlr.PostgreSql.PostgreSqlGrammarVisitor import PostgreSqlGrammarVisitor
 
+
+class WhereClauseVisitor(PostgreSqlGrammarVisitor):
+
+    def __init__(self, messages):
+        super().__init__()
+        self.smells = []
+        self.messages = messages
+
+    def visitFunction_call(self, ctx):
+        code = "NDB004"
+        message = self.messages["no_db_access"][code]["description"]
+        recommendation = self.messages["no_db_access"][code]["recommendation"]
+        example = self.messages["no_db_access"][code]["example"]
+        self.smells.append({
+            "line": ctx.start.line,
+            "code": code,
+            "message": message,
+            "recommendation": recommendation,
+            "example": example
+        })
+        return self.visitChildren(ctx)
+
 class SmellVisitor(PostgreSqlGrammarVisitor):
 
     def __init__(self, messages):
@@ -35,6 +57,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
 
         # Detect JOIN without condition
         self._detect_cartesian_product(ctx)
+
+        # Detect functions in WHERE clauses
+        self._detect_functions_in_where(ctx)
 
         return self.visitChildren(ctx)
 
@@ -84,6 +109,13 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 "recommendation": recommendation,
                 "example": example
             })
+
+    def _detect_functions_in_where(self, ctx):
+        if ctx.WHERE():
+            where_clause = ctx.expr()
+            where_visitor = WhereClauseVisitor(self.messages)
+            where_visitor.visit(where_clause)
+            self.smells.extend(where_visitor.smells)
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
