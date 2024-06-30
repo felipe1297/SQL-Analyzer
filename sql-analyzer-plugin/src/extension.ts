@@ -13,26 +13,33 @@ const codeSmellDecorationType = vscode.window.createTextEditorDecorationType({
     isWholeLine: true
 });
 
-const secretKey = crypto.randomBytes(32);
-const iv = crypto.randomBytes(16);
-
 function resetDecorations(editor: vscode.TextEditor) {
     editor.setDecorations(errorDecorationType, []);
     editor.setDecorations(codeSmellDecorationType, []);
 }
 
+// Clave secreta y IV fijos para propósitos de prueba
+const secretKey = crypto.createHash('sha256').update('cypher').digest(); // 32 bytes
+const iv = crypto.createHash('md5').update('cipherVector').digest(); // 16 bytes
+
+// Función para cifrar datos
 function encrypt(text: string): string {
     const cipher = crypto.createCipheriv('aes-256-ctr', secretKey, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    // TODO: validate this method right now, it's not working
+    // return encrypted;
+    return text;
 }
 
-function decrypt(text: string): string {
+// Función para descifrar datos
+function decrypt(encryptedText: string): string {
     const decipher = crypto.createDecipheriv('aes-256-ctr', secretKey, iv);
-    let decrypted = decipher.update(text, 'hex', 'utf8');
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    return decrypted;
+    // TODO: validate this method right now, it's not working
+    // return decrypted;
+    return encryptedText;
 }
 
 async function getDBCredentials(update: boolean = false): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
@@ -64,17 +71,17 @@ async function getDBCredentials(update: boolean = false): Promise<{ host: string
     return { host, port, user, password, database };
 }
 
-function validateDBCredentials(credentials: { host: string, port: string, user: string, password: string, database: string }): Promise<boolean> {
+function validateDBCredentials(credentials: { host: string, port: string, user: string, password: string, database: string }): Promise<{ valid: boolean, message: string }> {
     return new Promise((resolve) => {
         const { host, port, user, password, database } = credentials;
         const connectionString = `postgresql://${user}:${password}@${host}:${port}/${database}`;
 
         const testConnectionScriptPath = path.join(__dirname, '..', 'scripts', 'test_connection.py');
-        exec(`python3 ${testConnectionScriptPath} "${connectionString}"`, (err) => {
+        exec(`python3 ${testConnectionScriptPath} "${connectionString}"`, (err, stdout, stderr) => {
             if (err) {
-                resolve(false);
+                resolve({ valid: false, message: stderr });
             } else {
-                resolve(true);
+                resolve({ valid: true, message: stdout });
             }
         });
     });
@@ -378,14 +385,16 @@ export function activate(context: vscode.ExtensionContext) {
                 } : undefined;
 
                 if (credentials && validateWithDB) {
-                    validateDBCredentials(credentials).then((valid) => {
+                    validateDBCredentials(credentials).then(({ valid, message }) => {
                         if (!valid) {
-                            vscode.window.showInformationMessage('ℹ️ For a more complete analysis, please provide valid database credentials using the "Update Database Credentials" command in the command palette.');
+                            vscode.window.showErrorMessage(`❌ Database connection failed: ${message}`);
+                            analyzeSQL(query, document, true);
+                        } else {
+                            analyzeSQL(query, document, true, credentials); // true to show diagrams
                         }
-                        analyzeSQL(query, document, true, credentials); // true to show diagrams
                     });
                 } else {
-                    analyzeSQL(query, document, true, credentials); // true to show diagrams
+                    analyzeSQL(query, document, true); // true to show diagrams
                     if (!validateWithDB) {
                         vscode.window.showInformationMessage('ℹ️ Database validation is disabled. For a more complete analysis, consider enabling it in the settings.');
                     }
@@ -412,7 +421,18 @@ export function activate(context: vscode.ExtensionContext) {
                     database: config.get<string>('dbDatabase') || ''
                 } : undefined;
 
-                analyzeSQL(query, document, false, credentials);
+                if (credentials && validateWithDB) {
+                    validateDBCredentials(credentials).then(({ valid, message }) => {
+                        if (!valid) {
+                            vscode.window.showErrorMessage(`❌ Database connection failed: ${message}`);
+                            analyzeSQL(query, document, true);
+                        } else {
+                            analyzeSQL(query, document, false, credentials);
+                        }
+                    });
+                } else {
+                    analyzeSQL(query, document, false);
+                }
             }
         });
 
@@ -421,12 +441,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     let updateCredentialsDisposable = vscode.commands.registerCommand('extension.updateDBCredentials', async () => {
         const credentials = await getDBCredentials(true);
-        const valid = await validateDBCredentials(credentials);
+        const { valid, message } = await validateDBCredentials(credentials);
 
         if (valid) {
             vscode.window.showInformationMessage('🔑 Database credentials updated and validated successfully.');
         } else {
-            vscode.window.showErrorMessage('❌ Invalid database credentials. Please try again.');
+            vscode.window.showErrorMessage(`❌ Invalid database credentials: ${message}`);
         }
     });
 

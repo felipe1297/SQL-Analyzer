@@ -2,11 +2,12 @@ import sys
 import json
 import os
 from antlr4 import *
+from difflib import SequenceMatcher
+import psycopg2
 from antlr4.error.ErrorListener import ErrorListener
 from antlr.PostgreSql.PostgreSqlGrammarLexer import PostgreSqlGrammarLexer
 from antlr.PostgreSql.PostgreSqlGrammarParser import PostgreSqlGrammarParser
 from antlr.PostgreSql.PostgreSqlGrammarVisitor import PostgreSqlGrammarVisitor
-from difflib import SequenceMatcher
 
 class WhereClauseVisitor(PostgreSqlGrammarVisitor):
 
@@ -85,13 +86,38 @@ class WhereClauseVisitor(PostgreSqlGrammarVisitor):
 
 class SmellVisitor(PostgreSqlGrammarVisitor):
 
-    def __init__(self, messages):
+    def __init__(self, messages, db_credentials=None):
         self.smells = []
         self.messages = messages
         self.no_db_access = "no_db_access"
         self.db_access = "db_access"
         self.levenshtein_similarity_ratio = 0.6
+        self.db_credentials = db_credentials
+        self.db_connection = None
 
+        if self.db_credentials:
+            try:
+                self.db_connection = self._connect_to_db()
+            except Exception as e:
+                print(f"Error connecting to database: {e}")
+                self.db_connection = None
+
+    def _connect_to_db(self):
+        host = self.db_credentials["host"]
+        port = self.db_credentials["port"]
+        user = self.db_credentials["user"]
+        password = self.db_credentials["password"]
+        database = self.db_credentials["database"]
+
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database
+        )
+        return conn
+    
     def visitSelect_stmt(self, ctx):
         # Detect SELECT *
         if ctx.STAR():
@@ -127,6 +153,11 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
 
         # Detect unclear or unnecessary aliases
         self._detect_unclear_aliases(ctx)
+
+        if self.db_connection:
+            self._detect_missing_indexes_on_joins(ctx)
+        else:
+            self._add_missing_db_connection_smell()
 
         return self.visitChildren(ctx)
 
@@ -322,6 +353,23 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                             "example": example
                         })
 
+    def _add_missing_db_connection_smell(self):
+        code = "DB_CONN"
+        message = "Database connection is not available. Database-specific analyses are disabled."
+        self.smells.append({
+            "line": 0,
+            "code": code,
+            "message": message,
+            "recommendation": "",
+            "example": ""
+        })
+
+    def _detect_missing_indexes_on_joins(self, ctx):
+        if self.db_connection:
+            # Implementation for detecting missing indexes on JOIN columns
+            # This is a placeholder and should be replaced with actual logic
+            pass
+
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
@@ -331,7 +379,7 @@ class CustomErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         self.errors.append({"line": line, "message": f"❌ Syntax error at line {line}: {msg}"})
 
-def analyze_sql(sql_content, messages):
+def analyze_sql(sql_content, messages, db_credentials=None):
     input_stream = InputStream(sql_content)
     lexer = PostgreSqlGrammarLexer(input_stream)
     token_stream = CommonTokenStream(lexer)
@@ -351,7 +399,7 @@ def analyze_sql(sql_content, messages):
             "codeSmells": []
         })
 
-    visitor = SmellVisitor(messages)
+    visitor = SmellVisitor(messages, db_credentials)
     visitor.visit(tree)
 
     # Agrupar mensajes por línea sin duplicados
@@ -388,29 +436,43 @@ def read_json_file(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
-if __name__ == "__main__":
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
-
-    messages = read_json_file(messages_path)
-
-    query = sys.argv[1]
-    result = analyze_sql(query, messages)
-    print(result)
-
-
-
-# def read_sql_file(file_path):
-#     with open(file_path, 'r') as file:
-#         return file.read()
-    
 # if __name__ == "__main__":
-#     # Ajustar la ruta para subir dos niveles en el directorio
 #     script_dir = os.path.dirname(os.path.realpath(__file__))
 #     messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
+
 #     messages = read_json_file(messages_path)
 
-#     sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Ruta al archivo de consultas SQL
-#     query = read_sql_file(sql_file)
-#     result = analyze_sql(query, messages)
+#     query = sys.argv[1]
+#     db_credentials = None
+#     if len(sys.argv) > 2:
+#         db_credentials = sys.argv[2:7]
+
+#     result = analyze_sql(query, messages, db_credentials)
 #     print(result)
+
+
+
+def read_sql_file(file_path):
+    with open(file_path, 'r') as file:
+        return file.read()
+    
+if __name__ == "__main__":
+    # Ajustar la ruta para subir dos niveles en el directorio
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
+    messages = read_json_file(messages_path)
+
+    sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Ruta al archivo de consultas SQL
+    query = read_sql_file(sql_file)
+
+    # Datos de la base de datos para pruebas
+    db_credentials = {
+        "host": "localhost",
+        "port": 5433,
+        "user": "testuser",
+        "password": "testpassword",
+        "database": "testdb"
+    }
+
+    result = analyze_sql(query, messages, db_credentials)
+    print(result)
