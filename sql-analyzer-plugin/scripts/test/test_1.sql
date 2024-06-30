@@ -1,4 +1,1 @@
-SELECT * FROM (SELECT * FROM orders WHERE amount > 100) AS sub;
-SELECT * FROM (SELECT * FROM orders WHERE amount > 100) AS sub;
-SELECT * FROM (SELECT * FROM orders WHERE amount > 100) AS sub;
-SELECT * FROM (SELECT * FROM orders WHERE amount > 100) AS sub;
+SELECT COUNT(*), a name FROM (SELECT count(a) from a group by a);

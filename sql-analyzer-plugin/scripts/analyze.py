@@ -118,6 +118,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         # Detect DISTINCT usage
         self._detect_distinct_usage(ctx)
 
+        # Detect aggregate functions without GROUP BY clause
+        self._detect_aggregate_without_group_by(ctx)
+
         return self.visitChildren(ctx)
 
     def _detect_nested_subqueries(self, ctx):
@@ -187,6 +190,34 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 "recommendation": recommendation,
                 "example": example
             })
+
+    def _detect_aggregate_without_group_by(self, ctx):
+        has_group_by = any(isinstance(child, PostgreSqlGrammarParser.Group_by_clauseContext) for child in ctx.children)
+        if not has_group_by:
+            for result_column in ctx.result_column():
+                if self._is_aggregate_function(result_column):
+                    code = "NDB008"
+                    message = self.messages[self.no_db_access][code]["description"]
+                    recommendation = self.messages[self.no_db_access][code]["recommendation"]
+                    example = self.messages[self.no_db_access][code]["example"]
+                    self.smells.append({
+                        "line": ctx.start.line,
+                        "code": code,
+                        "message": message,
+                        "recommendation": recommendation,
+                        "example": example
+                    })
+
+    def _is_aggregate_function(self, ctx):
+        if ctx.getChildCount() > 0:
+            for i in range(ctx.getChildCount()):
+                child = ctx.getChild(i)
+                if isinstance(child, PostgreSqlGrammarParser.Agg_funcContext):
+                    return True
+                elif isinstance(child, TerminalNode):
+                    token = child.getSymbol().text.upper()
+                    return any(token.startswith(word) for word in ["COUNT", "SUM", "AVG", "MIN", "MAX"])
+        return False
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
