@@ -196,7 +196,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
                         
                         codeSmellDecorations.push({
                             range: range,
-                            hoverMessage: `${smell.message}\n${smell.recommendation}`
+                            hoverMessage: `${smell.message}\n`
                         });
                     } catch (err) {
                         console.error("Error creating decoration range for code smells:", err);

@@ -28,6 +28,30 @@ class WhereClauseVisitor(PostgreSqlGrammarVisitor):
             "example": example
         })
         return self.visitChildren(ctx)
+    
+    def visitExpr(self, ctx):
+        if self._is_trivial_condition(ctx):
+            code = "NDB005"
+            message = self.messages["no_db_access"][code]["description"]
+            recommendation = self.messages["no_db_access"][code]["recommendation"]
+            example = self.messages["no_db_access"][code]["example"]
+            self.smells.append({
+                "line": ctx.start.line,
+                "code": code,
+                "message": message,
+                "recommendation": recommendation,
+                "example": example
+            })
+        return self.visitChildren(ctx)
+
+    def _is_trivial_condition(self, ctx):
+        if ctx.getChildCount() == 3:
+            left = ctx.getChild(0).getText()
+            op = ctx.getChild(1).getText()
+            right = ctx.getChild(2).getText()
+            if (left == right and op in ['=', '!=']) or (left in ['1', '0'] and right in ['1', '0']):
+                return True
+        return False
 
 class SmellVisitor(PostgreSqlGrammarVisitor):
 
