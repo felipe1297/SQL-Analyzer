@@ -15,12 +15,18 @@ sql_stmt:
 	| update_stmt SEMI
 	| delete_stmt SEMI;
 
-select_stmt: (WITH with_clause)? SELECT (DISTINCT)? (
+select_stmt: LPAREN select_stmt RPAREN | ((WITH with_clause)? SELECT (DISTINCT)? (
 		STAR
 		| (result_column (COMMA result_column)*)
 	) FROM table_reference (COMMA table_reference)* (join_clause)* (WHERE expr)? (
 		group_by_clause
-	)? (order_by_clause)?;
+	)? (order_by_clause)? limit_offset_clause);
+
+limit_offset_clause
+: (LIMIT  (expr | NUMBER)  (OFFSET expr)?)?
+| (OFFSET (expr | NUMBER))?
+| (FETCH FIRST expr ROWS ONLY)?
+;
 
 function_stmt:
 	CREATE FUNCTION ID LPAREN function_params? RPAREN RETURNS ID AS func_body;
@@ -110,10 +116,6 @@ update_assignment: ID EQ value;
 delete_stmt: DELETE FROM table_name (WHERE expr)?;
 
 value: STRING | NUMBER | NULL | expr;
-
-limit_offset_clause: (OFFSET expr ROWS)? (
-		FETCH FIRST expr ROWS ONLY
-	)?;
 
 with_clause: WITH cte (COMMA cte)*;
 
@@ -356,6 +358,7 @@ TO: T O;
 ADD: A D D;
 COLUMN: C O L U M N;
 DATABASE: D A T A B A S E;
+LIMIT: L I M I T;
 
 // Funciones de cadena
 LEN: L E N;

@@ -24,6 +24,11 @@ class PostgreSqlGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
+    def visitLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by PostgreSqlGrammarParser#function_stmt.
     def visitFunction_stmt(self, ctx:PostgreSqlGrammarParser.Function_stmtContext):
         return self.visitChildren(ctx)
@@ -121,11 +126,6 @@ class PostgreSqlGrammarVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by PostgreSqlGrammarParser#value.
     def visitValue(self, ctx:PostgreSqlGrammarParser.ValueContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
-    def visitLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
         return self.visitChildren(ctx)
 
 

@@ -65,14 +65,6 @@
             }
         },
         "NDB009": {
-            "description": "⚠️ HAVING should only be used to filter aggregated results, not for general conditions.",
-            "recommendation": "💡 Use WHERE for general conditions and HAVING for post-aggregation conditions.",
-            "example": {
-                "bad": "SELECT COUNT(*), name FROM users HAVING name = 'John';",
-                "good": "SELECT COUNT(*), name FROM users WHERE name = 'John' GROUP BY name;"
-            }
-        },
-        "NDB010": {
             "description": "⚠️ OFFSET without LIMIT can lead to retrieving large amounts of unnecessary data.",
             "recommendation": "💡 Always use LIMIT with OFFSET.",
             "example": {
@@ -80,7 +72,7 @@
                 "good": "SELECT * FROM users LIMIT 10 OFFSET 10;"
             }
         },
-        "NDB011": {
+        "NDB010": {
             "description": "⚠️ Using unclear or unnecessary aliases can make the code harder to read.",
             "recommendation": "💡 Use clear aliases only when necessary.",
             "example": {

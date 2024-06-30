@@ -35,6 +35,15 @@ class PostgreSqlGrammarListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
+    def enterLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
+        pass
+
+    # Exit a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
+    def exitLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
+        pass
+
+
     # Enter a parse tree produced by PostgreSqlGrammarParser#function_stmt.
     def enterFunction_stmt(self, ctx:PostgreSqlGrammarParser.Function_stmtContext):
         pass
@@ -212,15 +221,6 @@ class PostgreSqlGrammarListener(ParseTreeListener):
 
     # Exit a parse tree produced by PostgreSqlGrammarParser#value.
     def exitValue(self, ctx:PostgreSqlGrammarParser.ValueContext):
-        pass
-
-
-    # Enter a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
-    def enterLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
-        pass
-
-    # Exit a parse tree produced by PostgreSqlGrammarParser#limit_offset_clause.
-    def exitLimit_offset_clause(self, ctx:PostgreSqlGrammarParser.Limit_offset_clauseContext):
         pass
 
 

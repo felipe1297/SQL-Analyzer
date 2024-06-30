@@ -121,6 +121,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         # Detect aggregate functions without GROUP BY clause
         self._detect_aggregate_without_group_by(ctx)
 
+        # Detect OFFSET without LIMIT
+        self._detect_offset_without_limit(ctx)
+
         return self.visitChildren(ctx)
 
     def _detect_nested_subqueries(self, ctx):
@@ -218,6 +221,30 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                     token = child.getSymbol().text.upper()
                     return any(token.startswith(word) for word in ["COUNT", "SUM", "AVG", "MIN", "MAX"])
         return False
+    
+    def _detect_offset_without_limit(self, ctx):
+        has_offset_without_limit = False
+
+        for child in ctx.children:
+            if isinstance(child, PostgreSqlGrammarParser.Limit_offset_clauseContext) and child.children:
+                has_limit = any(grandchild for grandchild in child.children if grandchild.getText().upper() == 'LIMIT')
+                has_offset = any(grandchild for grandchild in child.children if grandchild.getText().upper() == 'OFFSET')
+                
+                if has_offset and not has_limit:
+                    has_offset_without_limit = True
+
+        if has_offset_without_limit:
+            code = "NDB009"
+            message = self.messages[self.no_db_access][code]["description"]
+            recommendation = self.messages[self.no_db_access][code]["recommendation"]
+            example = self.messages[self.no_db_access][code]["example"]
+            self.smells.append({
+                "line": ctx.start.line,
+                "code": code,
+                "message": message,
+                "recommendation": recommendation,
+                "example": example
+            })
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
