@@ -85,6 +85,9 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         # Detect functions in WHERE clauses
         self._detect_functions_in_where(ctx)
 
+        # Detect DISTINCT usage
+        self._detect_distinct_usage(ctx)
+
         return self.visitChildren(ctx)
 
     def _detect_nested_subqueries(self, ctx):
@@ -140,6 +143,20 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
             where_visitor = WhereClauseVisitor(self.messages)
             where_visitor.visit(where_clause)
             self.smells.extend(where_visitor.smells)
+
+    def _detect_distinct_usage(self, ctx):
+        if ctx.DISTINCT():
+            code = "NDB006"
+            message = self.messages[self.no_db_access][code]["description"]
+            recommendation = self.messages[self.no_db_access][code]["recommendation"]
+            example = self.messages[self.no_db_access][code]["example"]
+            self.smells.append({
+                "line": ctx.start.line,
+                "code": code,
+                "message": message,
+                "recommendation": recommendation,
+                "example": example
+            })
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
