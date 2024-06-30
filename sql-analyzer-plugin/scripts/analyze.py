@@ -164,7 +164,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
 
         if self.db_connection:
             # self._detect_missing_indexes_on_joins(ctx, table_references)
-            pass
+            self._detect_missing_indexes_on_where(ctx, table_references)
         else:
             self._add_missing_db_connection_smell()
 
@@ -434,28 +434,28 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 self._analyze_on_expression(left, table_references)
                 self._analyze_on_expression(right, table_references)
             else:
-                self._process_comparison(left, op, right, table_references)
+                self._process_comparison(left, op, right, table_references, 1)
 
         elif ctx.getChildCount() > 1:
             for i in range(ctx.getChildCount()):
                 self._analyze_on_expression(ctx.getChild(i), table_references)
 
-    def _process_comparison(self, left, op, right, table_references):
+    def _process_comparison(self, left, op, right, table_references, opt):
         if self._is_simple_column(left) and self._is_simple_column(right):
             left_table, left_column = self._resolve_column(left, table_references)
             right_table, right_column = self._resolve_column(right, table_references)
 
             if left_table and left_column:
-                self._check_index(left_table, left_column, left.start.line)
+                self._check_index(left_table, left_column, left.start.line, opt)
 
             if right_table and right_column:
-                self._check_index(right_table, right_column, right.start.line)
+                self._check_index(right_table, right_column, right.start.line, opt)
 
         elif self._is_function_call(left) or self._is_function_call(right):
             if self._is_simple_column(left):
                 left_table, left_column = self._resolve_column(left, table_references)
                 if left_table and left_column:
-                    self._check_index(left_table, left_column, left.start.line)
+                    self._check_index(left_table, left_column, left.start.line, opt)
 
             if self._is_simple_column(right):
                 right_table, right_column = self._resolve_column(right, table_references)
@@ -525,7 +525,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         cursor.close()
         return result is not None
 
-    def _check_index(self, table, column, line):
+    def _check_index(self, table, column, line, opt):
         if self.db_connection:
             query = sql.SQL("SELECT 1 FROM pg_indexes WHERE tablename = {table} AND indexdef LIKE {pattern}").format(
                 table=sql.Literal(table),
@@ -536,17 +536,51 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
             result = cursor.fetchone()
             cursor.close()
             if not result:
-                code = "DB001"
-                message = self.messages["db_access"][code]["description"]
-                recommendation = self.messages["db_access"][code]["recommendation"]
-                example = self.messages["db_access"][code]["example"]
-                self.smells.append({
-                    "line": line,
-                    "code": code,
-                    "message": message,
-                    "recommendation": recommendation,
-                    "example": example
-                })
+                if opt == 1:
+                    code = "DB001"
+                    message = self.messages["db_access"][code]["description"]
+                    recommendation = self.messages["db_access"][code]["recommendation"]
+                    example = self.messages["db_access"][code]["example"]
+                    self.smells.append({
+                        "line": line,
+                        "code": code,
+                        "message": message,
+                        "recommendation": recommendation,
+                        "example": example
+                    })
+                elif opt == 2:
+                    code = "DB002"
+                    message = self.messages["db_access"][code]["description"]
+                    recommendation = self.messages["db_access"][code]["recommendation"]
+                    example = self.messages["db_access"][code]["example"]
+                    self.smells.append({
+                        "line": line,
+                        "code": code,
+                        "message": message,
+                        "recommendation": recommendation,
+                        "example": example
+                    })
+
+    def _detect_missing_indexes_on_where(self, ctx, table_references):
+        if ctx.WHERE():
+            where_clause = ctx.expr()
+            self._analyze_where_expression(where_clause, table_references)
+
+    def _analyze_where_expression(self, ctx, table_references):
+        if ctx.getChildCount() == 3:
+            left = ctx.getChild(0)
+            op = ctx.getChild(1).getText()
+            right = ctx.getChild(2)
+
+            if op.upper() in ["AND", "OR"]:
+                self._analyze_where_expression(left, table_references)
+                self._analyze_where_expression(right, table_references)
+            else:
+                self._process_comparison(left, op, right, table_references, 2)
+
+        elif ctx.getChildCount() > 1:
+            for i in range(ctx.getChildCount()):
+                self._analyze_where_expression(ctx.getChild(i), table_references)
 
 class CustomErrorListener(ErrorListener):
     def __init__(self):
