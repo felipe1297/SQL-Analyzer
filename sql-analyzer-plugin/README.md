@@ -1,71 +1,143 @@
-# sql-analyzer-plugin README
+# SQL Analyzer Plugin
 
-This is the README for your extension "sql-analyzer-plugin". After writing up a brief description, we recommend including the following sections.
+**Description**:
+The SQL Analyzer Plugin for VSCode is designed to analyze SQL scripts, identify code smells, and provide suggestions for improvements directly within your editor. It leverages ANTLR for parsing SQL queries and offers various features such as complexity analysis, code smell detection, and execution plan visualization.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Analyze SQL Code**: Provides recommendations, diagrams, and analysis of SQL code.
+- **Real-time Feedback**: Gives real-time feedback on SQL scripts directly within VSCode.
+- **Execution Plan Visualization**: Displays execution plans to help understand query performance.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- Visual Studio Code (version 1.90.0 or higher)
+- Node.js
+- Python 3.x
+- ANTLR 4.x
 
-## Extension Settings
+## Installation
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+1. **Clone the repository**:
+    ```bash
+    git clone https://github.com/felipe1297/SQL-Analyzer
+    cd sql-analyzer
+    ```
 
-For example:
+2. **Install Node.js dependencies**:
+    ```bash
+    npm install
+    ```
 
-This extension contributes the following settings:
+3. **Install Python dependencies**:
+    ```bash
+    pip install psycopg2 graphviz matplotlib antlr4-python3-runtime
+    ```
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+4. **Build the extension**:
+    ```bash
+    npm run compile
+    ```
+
+5. **Install the extension in VSCode**:
+    - Open VSCode
+    - Go to the Extensions sidebar
+    - Click on "Install from VSIX..." and select the generated `.vsix` file from the `out` directory
+
+## Usage
+
+### Commands
+
+This extension contributes the following commands:
+
+- `extension.analyzeSQL`: Analyze SQL
+- `extension.updateDBCredentials`: Update Database Credentials
+- `extension.showDBCredentials`: Show Database Credentials
+
+### Configuration
+
+The extension provides several settings to customize its behavior:
+
+- `sqlAnalyzer.dbHost`: Database host for SQL Analyzer
+- `sqlAnalyzer.dbPort`: Database port for SQL Analyzer (default: 5432)
+- `sqlAnalyzer.dbUser`: Database user for SQL Analyzer
+- `sqlAnalyzer.dbPassword`: Database password for SQL Analyzer
+- `sqlAnalyzer.dbDatabase`: Database name for SQL Analyzer
+- `sqlAnalyzer.realTimeAnalysis`: Enable real-time analysis of SQL files on save
+- `sqlAnalyzer.validateWithDB`: Analyze with DB
+- `sqlAnalyzer.showDiagram`: Show diagrams with the analysis
+
+To configure these settings, go to the VSCode settings and search for "SQL Analyzer".
+
+## Example
+
+Here is a brief example of how to use the SQL Analyzer Plugin:
+
+1. Open a SQL file in VSCode.
+2. Press `Ctrl+Shift+P` to open the command palette.
+3. Type `Analyze SQL` and select the `Analyze SQL` command.
+4. View the analysis results, recommendations, and diagrams directly in the VSCode interface.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- Integration with CI/CD pipeline is still under development.
+- Real-time analysis might affect performance on large SQL files.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
+- Initial release of SQL Analyzer Plugin.
 
-Initial release of ...
+## Development
 
-### 1.0.1
+### Prerequisites
 
-Fixed issue #.
+Ensure you have the following installed:
 
-### 1.1.0
+- Node.js
+- Python 3.x
+- ANTLR 4.x
 
-Added features X, Y, and Z.
+### Setup
 
----
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/felipe1297/SQL-Analyzer
+    cd sql-analyzer
+    ```
 
-## Following extension guidelines
+2. Install Node.js dependencies:
+    ```bash
+    npm install
+    ```
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+3. Install Python dependencies:
+    ```bash
+    pip install psycopg2 graphviz matplotlib antlr4-python3-runtime
+    ```
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+4. Build the extension:
+    ```bash
+    npm run compile
+    ```
 
-## Working with Markdown
+5. Open the project in VSCode:
+    ```bash
+    code .
+    ```
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+6. Start debugging (press `F5` in VSCode).
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## License
 
-## For more information
+This project is licensed under the Proprietary License. See the [LICENSE](LICENSE) file for details.
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## Contact
+
+For permission requests or further information, please contact:
+
+Felipe Esteban Riaño Pineda  
+Email: [friano@unal.edu.co](mailto:friano@unal.edu.co), [felipepineda1997@gmail.com](mailto:felipepineda1997@gmail.com)
 
 **Enjoy!**
