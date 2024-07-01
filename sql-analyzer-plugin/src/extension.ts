@@ -18,11 +18,11 @@ function resetDecorations(editor: vscode.TextEditor) {
     editor.setDecorations(codeSmellDecorationType, []);
 }
 
-// Clave secreta y IV fijos para propósitos de prueba
+// Fixed secret key and IV for testing purposes
 const secretKey = crypto.createHash('sha256').update('cypher').digest(); // 32 bytes
 const iv = crypto.createHash('md5').update('cipherVector').digest(); // 16 bytes
 
-// Función para cifrar datos
+// Function to encrypt data
 function encrypt(text: string): string {
     const cipher = crypto.createCipheriv('aes-256-ctr', secretKey, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -32,7 +32,7 @@ function encrypt(text: string): string {
     return text;
 }
 
-// Función para descifrar datos
+// Decrypt function
 function decrypt(encryptedText: string): string {
     const decipher = crypto.createDecipheriv('aes-256-ctr', secretKey, iv);
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
@@ -41,6 +41,7 @@ function decrypt(encryptedText: string): string {
     // return decrypted;
     return encryptedText;
 }
+
 async function getDBCredentials(update: boolean = false): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     let host = update ? '' : config.get<string>('dbHost') || '';
@@ -278,7 +279,6 @@ function removeComments(sql: string): string {
     return sql;
 }
 
-
 function createWebviewPanel(executionPlan: string[], smellsBarChart: string, codeSmells: { line: number, message: string, smells: { line: number, code: string, message: string, recommendation: string, example: { bad: string, good: string } }[] }[], queries: string, complexityScores: any) {
     const panel = vscode.window.createWebviewPanel(
         'sqlAnalyzer',
@@ -331,7 +331,6 @@ function createWebviewPanel(executionPlan: string[], smellsBarChart: string, cod
         }
     }, 500);
 }
-
 
 function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, codeSmellsHTML: string, queries: string[], complexityScores: any[]): string {
     const escudoUNALPath = vscode.Uri.file(path.join(__dirname, 'UNAL.png')).with({ scheme: 'vscode-resource' });
@@ -508,8 +507,6 @@ function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, co
         </body>
         </html>`;
 }
-
-
 
 export function activate(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');

@@ -42,7 +42,9 @@ The SQL Analyzer Plugin for VSCode is designed to analyze SQL scripts, identify 
 5. **Install the extension in VSCode**:
     - Open VSCode
     - Go to the Extensions sidebar
-    - Click on "Install from VSIX..." and select the generated `.vsix` file from the `out` directory
+    - Click on "Install from VSIX..." and select the generated `.vsix` file from the `out` directory7
+
+##### NOTE: Follow this instructions to run the plugin https://www.youtube.com/watch?v=q5V4T3o3CXE&t=298s 
 
 ## Usage
 

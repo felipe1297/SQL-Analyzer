@@ -447,7 +447,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 self._analyze_on_expression(ctx.getChild(i), table_references)
 
     def _process_comparison(self, left, op, right, table_references, opt):
-        # Procesar columna izquierda
+        # Process left column
         if self._is_simple_column(left):
             left_table, left_column = self._resolve_column(left, table_references)
             if left_table and left_column:
@@ -455,7 +455,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         elif self._is_function_call(left):
             self._process_function_call(left, table_references, opt)
 
-        # Procesar columna derecha
+        # Process right column
         if self._is_simple_column(right):
             right_table, right_column = self._resolve_column(right, table_references)
             if right_table and right_column:
@@ -597,17 +597,17 @@ if not os.path.exists(output_dir):
 
 def create_execution_plan_tree_base64(json_string):
     try:
-        # Convertir el JSON string a un diccionario
+        # Convert the JSON string to a dictionary
         json_data = json.loads(json_string)
         
-        # Verificar si json_data es una lista o un diccionario
+        # Check if json_data is a list or a dictionary
         if isinstance(json_data, list):
-            json_data = json_data[0]  # Obtener el primer elemento si es una lista
+            json_data = json_data[0]  # Get the first element if it is a list
 
-        # Crear un gráfico dirigido con Graphviz
+        # Create a directed graph with Graphviz
         dot = graphviz.Digraph(comment='Execution Plan Tree')
 
-        # Colores y emojis por tipo de nodo
+        # Colors and emojis by node type
         node_styles = {
             "Seq Scan": {"color": "lightblue", "emoji": "🔍"},
             "Hash Join": {"color": "lightgreen", "emoji": "🔗"},
@@ -621,7 +621,7 @@ def create_execution_plan_tree_base64(json_string):
             "default": {"color": "white", "emoji": "🔍"}
         }
 
-        # Función recursiva para agregar nodos y bordes al gráfico
+        # Recursive function to add nodes and edges to the graph
         def add_nodes_edges(node, parent_id=None):
             if isinstance(node, dict):
                 node_id = str(id(node))
@@ -644,7 +644,7 @@ def create_execution_plan_tree_base64(json_string):
                 for item in node:
                     add_nodes_edges(item, parent_id)
 
-        # Agregar el nodo raíz
+        # Add the root node
         root_key = list(json_data.keys())[0]
         root_node = json_data[root_key]
         root_id = str(id(root_node))
@@ -652,14 +652,14 @@ def create_execution_plan_tree_base64(json_string):
         dot.node(root_id, label=root_label, shape='box', style='rounded,filled', fillcolor='lightblue')
         add_nodes_edges(root_node, root_id)
 
-        # Guardar el gráfico como un archivo SVG y devolver el SVG como cadena base64
+        # Save the graph as an SVG file and return the SVG as a base64 string
         dot.format = 'svg'
         svg_data = dot.pipe().decode('utf-8')
         svg_base64 = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
         return svg_base64
 
     except Exception as e:
-        # Manejar errores en la generación del diagrama y devolver un SVG con el mensaje de error
+        # Handle errors in diagram generation and return an SVG with the error message
         dot = graphviz.Digraph(comment='Execution Plan Error')
         error_message = f"❌ Error: {str(e)}"
         dot.node('error', label=error_message, shape='box', style='rounded,filled', fillcolor='red')
@@ -751,7 +751,7 @@ def analyze_sql(sql_content, messages, db_credentials=None, generate_execution_p
     parser.addErrorListener(error_listener)
     lexer.addErrorListener(error_listener)
 
-    tree = parser.initial()  # Usar la regla 'initial' como punto de entrada
+    tree = parser.initial()  # Use the 'initial' rule as the entry point
 
     if error_listener.errors:
         return json.dumps({
@@ -770,7 +770,7 @@ def analyze_sql(sql_content, messages, db_credentials=None, generate_execution_p
     smells_bar_chart = create_smells_bar_chart(visitor.smells)
     complexity_score = calculate_complexity(visitor, tree)
 
-    # Agrupar mensajes por línea sin duplicados
+    # Group messages by line without duplicates
     detailed_messages = {}
 
     for smell in visitor.smells:
@@ -835,22 +835,21 @@ if __name__ == "__main__":
     result = analyze_sql(query, messages, db_credentials, str_to_bool(sys.argv[7]))
     print(result)
 
-
-
 def read_sql_file(file_path):
     with open(file_path, 'r') as file:
         return file.read()
-    
+
+# ***************TO LOCAL TEST AND DEBUG***************************
 # if __name__ == "__main__":
-#     # Ajustar la ruta para subir dos niveles en el directorio
+#     # Adjust the path to go up two levels in the directory
 #     script_dir = os.path.dirname(os.path.realpath(__file__))
 #     messages_path = os.path.abspath(os.path.join(script_dir, '..', '..', 'resources', 'smell-codes', 'smellCodeDictionary.json'))
 #     messages = read_json_file(messages_path)
 
-#     sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Ruta al archivo de consultas SQL
+#     sql_file = 'sql-analyzer-plugin/scripts/test/test_1.sql'  # Path to the SQL queries file
 #     query = read_sql_file(sql_file)
 
-#     # Datos de la base de datos para pruebas
+#     # Database credentials for testing
 #     db_credentials = {
 #         "host": "localhost",
 #         "port": 5433,

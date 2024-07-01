@@ -13,6 +13,7 @@ The SQL Analyzer is a tool designed to analyze SQL scripts, identify code smells
 ### Prerequisites
 - Python 3.x
 - ANTLR 4.x
+- Docker
 
 ### Setup
 1. **Clone the repository**:
@@ -30,6 +31,24 @@ The SQL Analyzer is a tool designed to analyze SQL scripts, identify code smells
     ```bash
     python main.py
     ```
+
+## Local Testing with Docker
+This project includes a `docker-compose.yml` file and an `init.sql` script for setting up a local database environment for testing the plugin.
+
+1. **Navigate to the `local-test` directory**:
+    ```bash
+    cd resources/local-test
+    ```
+
+2. **Run Docker Compose**:
+    ```bash
+    docker-compose up
+    ```
+
+This will set up a local database using the provided `init.sql` script.
+
+## Rules for Code Smells
+The rules for identifying code smells are located in the `smellCodeDictionary.json` file within the `resources/smell-codes` directory. These rules are essential for the functionality of the SQL Analyzer.
 
 ## Usage
 ### As a VSCode Plugin
