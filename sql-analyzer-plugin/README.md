@@ -87,7 +87,7 @@ Here is a brief example of how to use the SQL Analyzer Plugin:
 
 ## Release Notes
 
-### 0.0.1
+### 1.0.0
 
 - Initial release of SQL Analyzer Plugin.
 
