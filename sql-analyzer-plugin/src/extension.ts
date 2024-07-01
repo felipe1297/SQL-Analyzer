@@ -41,7 +41,6 @@ function decrypt(encryptedText: string): string {
     // return decrypted;
     return encryptedText;
 }
-
 async function getDBCredentials(update: boolean = false): Promise<{ host: string, port: string, user: string, password: string, database: string }> {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     let host = update ? '' : config.get<string>('dbHost') || '';
@@ -92,7 +91,7 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
     let command = `python3 ${scriptPath} "${query}"`;
 
     if (credentials) {
-        command += ` "${credentials.host}" "${credentials.port}" "${credentials.user}" "${credentials.password}" "${credentials.database}"`;
+        command += ` "${credentials.host}" "${credentials.port}" "${credentials.user}" "${credentials.password}" "${credentials.database}" ${showDiagram}`;
     }
 
     exec(command, (err, stdout, stderr) => {
@@ -219,7 +218,13 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
             vscode.window.showInformationMessage(`✅ Analysis completed.`);
 
             if (showDiagram) {
-                createWebviewPanel(analysisResults.diagram, analysisResults.codeSmells);
+                createWebviewPanel(
+                    analysisResults.executionPlan ? analysisResults.executionPlan : [],
+                    analysisResults.smellsBarChart || 'No Smells Chart',
+                    analysisResults.codeSmells,
+                    query,
+                    analysisResults.complexityScore
+                );
             }
         } else {
             console.log("No active editor found.");
@@ -227,15 +232,67 @@ async function analyzeSQL(query: string, document: vscode.TextDocument, showDiag
     });
 }
 
-function createWebviewPanel(diagramContent: string, codeSmells: { line: number, message: string, smells: { line: number, code: string, message: string, recommendation: string, example: { bad: string, good: string } }[] }[]) {
+function getEmojiForDepth(depth: number): string {
+    if (depth <= 3) {
+        return '🟢';
+    } else if (depth <= 6) {
+        return '🟡';
+    } else if (depth <= 9) {
+        return '🟠';
+    } else {
+        return '🔴';
+    }
+}
+
+function getEmojiForSmellsCount(smellsCount: number): string {
+    if (smellsCount === 0) {
+        return '✅';
+    } else if (smellsCount <= 2) {
+        return '🟢';
+    } else if (smellsCount <= 5) {
+        return '🟡';
+    } else if (smellsCount <= 8) {
+        return '🟠';
+    } else {
+        return '🔴';
+    }
+}
+
+function getEmojiForComplexityScore(score: number): string {
+    if (score > 2) {
+        return '🔵';
+    } else if (score > 1.5) {
+        return '🟢';
+    } else if (score > 1) {
+        return '🟡';
+    } else if (score > 0.5) {
+        return '🟠';
+    } else {
+        return '🔴';
+    }
+}
+
+
+function createWebviewPanel(executionPlan: string[], smellsBarChart: string, codeSmells: { line: number, message: string, smells: { line: number, code: string, message: string, recommendation: string, example: { bad: string, good: string } }[] }[], queries: string, complexityScores: any) {
     const panel = vscode.window.createWebviewPanel(
         'sqlAnalyzer',
-        'SQL Analyzer Diagram',
+        'SQL Analyzer Diagrams',
         vscode.ViewColumn.Beside,
         {
             enableScripts: true,
         }
     );
+
+    // Separar las consultas por ';' y eliminar saltos de línea
+    const queryList = queries.split(';').map(query => query.trim()).filter(query => query.length > 0);
+
+    const headers = `
+            <div class="complexity-header">
+                <div class="emoji"> Depth: ${getEmojiForDepth(complexityScores.depth)}</div>
+                <div class="emoji"> Code Smells Count: ${getEmojiForSmellsCount(complexityScores.smells_count)}</div>
+                <div class="emoji"> Complexity Score: ${getEmojiForComplexityScore(complexityScores.complexity_score)}</div>
+            </div>
+    `;
 
     const codeSmellsHTML = codeSmells.map(item => item.smells.map(smell => `
         <div class="code-smell">
@@ -249,7 +306,18 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
         </div>
     `).join("")).join("");
 
-    panel.webview.html = getWebviewContent(diagramContent, codeSmellsHTML);
+    // Incluir títulos de las consultas y la información de complejidad
+    const executionPlanHTML =  headers + executionPlan.map((svg, index) => {
+        return `
+        <div class="svg-item">
+            <div class="title">Query ${index + 1}: ${queryList[index]};</div>
+            <div class="minimize-button" onclick="toggleMinimize(this)">-</div>
+            <div class="svg-content"><img src="data:image/svg+xml;base64,${svg}"/></div>
+        </div>
+    `;
+    }).join("");
+
+    panel.webview.html = getWebviewContent(executionPlanHTML, smellsBarChart, codeSmellsHTML, queryList, complexityScores);
 
     setTimeout(() => {
         const editor = vscode.window.activeTextEditor;
@@ -259,14 +327,14 @@ function createWebviewPanel(diagramContent: string, codeSmells: { line: number, 
     }, 500);
 }
 
-function getWebviewContent(diagramContent: string, codeSmellsHTML: string): string {
+function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, codeSmellsHTML: string, queries: string[], complexityScores: any[]): string {
     return `
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SQL Analyzer Diagram</title>
+            <title>SQL Analyzer Diagrams</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -277,13 +345,14 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
                 h1 {
                     font-size: 1.8em;
                     color: #4a90e2;
+                    text-align: center;
                 }
                 .container {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                 }
-                .diagram {
+                .diagram, .code-smells, .bar-chart {
                     margin-top: 20px;
                     padding: 20px;
                     background-color: #fff;
@@ -291,28 +360,51 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
                     border-radius: 8px;
                     width: 80%;
                     max-width: 800px;
-                    min-height: 150px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 1.2em;
-                    color: #999;
                 }
-                .code-smells {
-                    margin-top: 20px;
-                    padding: 20px;
-                    background-color: #fff;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                .svg-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                    width: 100%;
+                }
+                .svg-item {
+                    position: relative;
+                    border: 1px solid #ddd;
+                    padding: 10px;
                     border-radius: 8px;
-                    width: 80%;
-                    max-width: 800px;
+                    background-color: #fff;
+                    transition: height 0.3s ease, width 0.3s ease;
+                }
+                .svg-item.minimized {
+                    height: 30px;
+                    overflow: hidden;
+                }
+                .svg-title {
+                    margin-bottom: 10px;
+                    font-size: 1.2em;
+                    color: #333;
+                }
+                .minimize-button {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    background-color: #ff4c4c;
+                    color: white;
+                    padding: 5px;
+                    cursor: pointer;
+                    border-radius: 3px;
+                    border: none;
+                }
+                .svg-content {
+                    padding: 20px;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
                 }
                 .code-smell {
                     display: flex;
                     flex-direction: column;
-                    align-items: flex-start;
                     margin-bottom: 15px;
-                    animation: fadeIn 1s ease-in-out;
                 }
                 .code-smell .message {
                     font-weight: bold;
@@ -331,7 +423,6 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
                     padding: 10px;
                     border-radius: 4px;
                     margin-bottom: 5px;
-                    transition: background-color 0.3s ease-in-out;
                 }
                 .example code.bad {
                     color: #ff4c4c;
@@ -339,35 +430,59 @@ function getWebviewContent(diagramContent: string, codeSmellsHTML: string): stri
                 .example code.good {
                     color: #4caf50;
                 }
-                .example code:hover {
-                    background-color: #e0e0e0;
+                .complexity-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 10px;
+                    background-color: #e3f2fd;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
                 }
-                @keyframes fadeIn {
-                    from {
-                        opacity: 0;
-                    }
-                    to {
-                        opacity: 1;
-                    }
+                .complexity-header div {
+                    flex: 1;
+                    text-align: center;
+                }
+                .complexity-header .title {
+                    font-size: 1.2em;
+                    font-weight: bold;
+                }
+                .complexity-header .emoji {
+                    font-size: 1.5em;
                 }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>SQL Analyzer Diagram</h1>
-                <div class="diagram">${diagramContent ? diagramContent : 'No diagram available'}</div>
+                <h1>Execution Plan</h1>
+                <div class="diagram svg-list">${executionPlanHTML}</div>
+                <h1>Code Smells Bar Chart</h1>
+                <div class="bar-chart"><img src="data:image/png;base64,${smellsBarChart}" /></div>
                 <h1>Code Smells</h1>
                 <div class="code-smells">${codeSmellsHTML}</div>
             </div>
+            <script>
+                function toggleMinimize(button) {
+                    const svgContainer = button.parentElement;
+                    const svgContent = svgContainer.querySelector('.svg-content');
+                    if (svgContent.style.display === 'none') {
+                        svgContent.style.display = 'block';
+                        button.textContent = '-';
+                    } else {
+                        svgContent.style.display = 'none';
+                        button.textContent = '+';
+                    }
+                }
+            </script>
         </body>
         </html>`;
 }
 
 export function activate(context: vscode.ExtensionContext) {
-
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');
     const realTimeAnalysis = config.get<boolean>('realTimeAnalysis', false);
-    const validateWithDB = config.get<boolean>('validateWithDB', true); // Add this configuration option
+    const validateWithDB = config.get<boolean>('validateWithDB', true); 
+    const showDiagram = config.get<boolean>('showDiagram', false); 
 
     let disposable = vscode.commands.registerCommand('extension.analyzeSQL', () => {
         const editor = vscode.window.activeTextEditor;
@@ -388,13 +503,13 @@ export function activate(context: vscode.ExtensionContext) {
                     validateDBCredentials(credentials).then(({ valid, message }) => {
                         if (!valid) {
                             vscode.window.showErrorMessage(`❌ Database connection failed: ${message}`);
-                            analyzeSQL(query, document, true);
+                            analyzeSQL(query, document, showDiagram);
                         } else {
-                            analyzeSQL(query, document, true, credentials); // true to show diagrams
+                            analyzeSQL(query, document, showDiagram, credentials);
                         }
                     });
                 } else {
-                    analyzeSQL(query, document, true); // true to show diagrams
+                    analyzeSQL(query, document, showDiagram);
                     if (!validateWithDB) {
                         vscode.window.showInformationMessage('ℹ️ Database validation is disabled. For a more complete analysis, consider enabling it in the settings.');
                     }
@@ -425,7 +540,7 @@ export function activate(context: vscode.ExtensionContext) {
                     validateDBCredentials(credentials).then(({ valid, message }) => {
                         if (!valid) {
                             vscode.window.showErrorMessage(`❌ Database connection failed: ${message}`);
-                            analyzeSQL(query, document, true);
+                            analyzeSQL(query, document, false);
                         } else {
                             analyzeSQL(query, document, false, credentials);
                         }

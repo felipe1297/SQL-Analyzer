@@ -1,6 +1,6 @@
 grammar PostgreSqlGrammar;
 
-initial: sql_stmt (sql_stmt)*;
+initial: (sql_stmt)*  EOF;
 
 // Reglas Sintácticas
 sql_stmt:

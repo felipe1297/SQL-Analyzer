@@ -1,10 +1,15 @@
 import sys
 import json
 import os
+import graphviz
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
 from antlr4 import *
 from difflib import SequenceMatcher
 import psycopg2
 from psycopg2 import sql
+import tempfile
 from antlr4.error.ErrorListener import ErrorListener
 from antlr.PostgreSql.PostgreSqlGrammarLexer import PostgreSqlGrammarLexer
 from antlr.PostgreSql.PostgreSqlGrammarParser import PostgreSqlGrammarParser
@@ -92,6 +97,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         self.messages = messages
         self.no_db_access = "no_db_access"
         self.db_access = "db_access"
+        self.table_references = []
         self.levenshtein_similarity_ratio = 0.6
         self.dbMessage = False
         self.db_credentials = db_credentials
@@ -126,7 +132,8 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
         return conn
     
     def visitSelect_stmt(self, ctx):
-        table_references = self._extract_table_aliases(ctx)
+        self.table_references = []
+        self.table_references = self._extract_table_aliases(ctx)
         # Detect SELECT *
         if ctx.STAR():
             code = "NDB001"
@@ -164,7 +171,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
 
         if self.db_connection:
             # self._detect_missing_indexes_on_joins(ctx, table_references)
-            self._detect_missing_indexes_on_where(ctx, table_references)
+            self._detect_missing_indexes_on_where(ctx, self.table_references)
         else:
             self._add_missing_db_connection_smell()
 
@@ -397,9 +404,8 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
             })
 
     def visitStandard_join(self, ctx):
-        table_references = self._extract_table_aliases(ctx)
         on_expr = ctx.expr()
-        self._analyze_on_expression(on_expr, table_references)
+        self._analyze_on_expression(on_expr, self.table_references)
 
         return self.visitChildren(ctx)
 
@@ -441,26 +447,21 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                 self._analyze_on_expression(ctx.getChild(i), table_references)
 
     def _process_comparison(self, left, op, right, table_references, opt):
-        if self._is_simple_column(left) and self._is_simple_column(right):
+        # Procesar columna izquierda
+        if self._is_simple_column(left):
             left_table, left_column = self._resolve_column(left, table_references)
-            right_table, right_column = self._resolve_column(right, table_references)
-
             if left_table and left_column:
                 self._check_index(left_table, left_column, left.start.line, opt)
+        elif self._is_function_call(left):
+            self._process_function_call(left, table_references, opt)
 
+        # Procesar columna derecha
+        if self._is_simple_column(right):
+            right_table, right_column = self._resolve_column(right, table_references)
             if right_table and right_column:
                 self._check_index(right_table, right_column, right.start.line, opt)
-
-        elif self._is_function_call(left) or self._is_function_call(right):
-            if self._is_simple_column(left):
-                left_table, left_column = self._resolve_column(left, table_references)
-                if left_table and left_column:
-                    self._check_index(left_table, left_column, left.start.line, opt)
-
-            if self._is_simple_column(right):
-                right_table, right_column = self._resolve_column(right, table_references)
-                if right_table and right_column:
-                    self._check_index(right_table, right_column, right.start.line)
+        elif self._is_function_call(right):
+            self._process_function_call(right, table_references, opt)
 
     def _is_simple_column(self, ctx):
         if isinstance(ctx, PostgreSqlGrammarParser.ComparatorExprContext):
@@ -488,7 +489,7 @@ class SmellVisitor(PostgreSqlGrammarVisitor):
                     return self._is_function_call(third_child)
             return False
         return False
-
+    
     def _resolve_column(self, ctx, table_references):
         if ctx.getChildCount() == 1:
             column = ctx.getText()
@@ -590,7 +591,156 @@ class CustomErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         self.errors.append({"line": line, "message": f"❌ Syntax error at line {line}: {msg}"})
 
-def analyze_sql(sql_content, messages, db_credentials=None):
+output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'output_images')
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+def create_execution_plan_tree_base64(json_string):
+    try:
+        # Convertir el JSON string a un diccionario
+        json_data = json.loads(json_string)
+        
+        # Verificar si json_data es una lista o un diccionario
+        if isinstance(json_data, list):
+            json_data = json_data[0]  # Obtener el primer elemento si es una lista
+
+        # Crear un gráfico dirigido con Graphviz
+        dot = graphviz.Digraph(comment='Execution Plan Tree')
+
+        # Colores y emojis por tipo de nodo
+        node_styles = {
+            "Seq Scan": {"color": "lightblue", "emoji": "🔍"},
+            "Hash Join": {"color": "lightgreen", "emoji": "🔗"},
+            "Nested Loop": {"color": "lightyellow", "emoji": "🔄"},
+            "Sort": {"color": "lightpink", "emoji": "🔃"},
+            "Index Only Scan": {"color": "lightcoral", "emoji": "📇"},
+            "Aggregate": {"color": "lightgrey", "emoji": "Σ"},
+            "Bitmap Heap Scan": {"color": "lightgoldenrodyellow", "emoji": "📂"},
+            "Bitmap Index Scan": {"color": "lightsteelblue", "emoji": "🗃"},
+            "Hash": {"color": "lavender", "emoji": "🔑"},
+            "default": {"color": "white", "emoji": "🔍"}
+        }
+
+        # Función recursiva para agregar nodos y bordes al gráfico
+        def add_nodes_edges(node, parent_id=None):
+            if isinstance(node, dict):
+                node_id = str(id(node))
+                node_type = node.get("Node Type", "default")
+                style = node_styles.get(node_type, node_styles["default"])
+                emoji = style["emoji"]
+                color = style["color"]
+
+                node_label = f"{emoji} " + "\n".join([f"{k}: {v}" for k, v in node.items() if not isinstance(v, (dict, list))])
+                dot.node(node_id, label=node_label, shape='box', style='rounded,filled', fillcolor=color)
+                
+                if parent_id:
+                    dot.edge(parent_id, node_id)
+
+                for k, v in node.items():
+                    if isinstance(v, (dict, list)):
+                        add_nodes_edges(v, node_id)
+                        
+            elif isinstance(node, list):
+                for item in node:
+                    add_nodes_edges(item, parent_id)
+
+        # Agregar el nodo raíz
+        root_key = list(json_data.keys())[0]
+        root_node = json_data[root_key]
+        root_id = str(id(root_node))
+        root_label = f"📄 {root_key}\n" + "\n".join([f"{k}: {v}" for k, v in root_node.items() if not isinstance(v, (dict, list))])
+        dot.node(root_id, label=root_label, shape='box', style='rounded,filled', fillcolor='lightblue')
+        add_nodes_edges(root_node, root_id)
+
+        # Guardar el gráfico como un archivo SVG y devolver el SVG como cadena base64
+        dot.format = 'svg'
+        svg_data = dot.pipe().decode('utf-8')
+        svg_base64 = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
+        return svg_base64
+
+    except Exception as e:
+        # Manejar errores en la generación del diagrama y devolver un SVG con el mensaje de error
+        dot = graphviz.Digraph(comment='Execution Plan Error')
+        error_message = f"❌ Error: {str(e)}"
+        dot.node('error', label=error_message, shape='box', style='rounded,filled', fillcolor='red')
+        dot.format = 'svg'
+        svg_data = dot.pipe().decode('utf-8')
+        svg_base64 = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
+        return svg_base64
+
+
+def create_smells_bar_chart(smells):
+    smell_counts = {}
+    for smell in smells:
+        code = smell['code']
+        if (code not in smell_counts):
+            smell_counts[code] = 0
+        smell_counts[code] += 1
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(smell_counts.keys(), smell_counts.values(), color='blue')
+    plt.xlabel('Code Smells')
+    plt.ylabel('Frequency')
+    plt.title('Code Smells Frequency')
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img_str = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+    return img_str
+
+def get_execution_plan(query, db_credentials):
+    try:
+        conn = psycopg2.connect(
+            host=db_credentials["host"],
+            port=db_credentials["port"],
+            user=db_credentials["user"],
+            password=db_credentials["password"],
+            database=db_credentials["database"]
+        )
+        cursor = conn.cursor()
+        cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+        plan = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return json.dumps(plan, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "query": {
+                "statement": query,
+                "execPlanStatus": "Not available",
+                "reason": str(e)
+            }
+        }, indent=2)
+    
+def calculate_complexity(visitor, tree):
+    depth = calculate_ast_depth(tree)
+    smells_count = len(visitor.smells)
+    complexity_score = depth / (smells_count + 1)  # Avoid division by zero
+    return {
+        "depth": depth,
+        "smells_count": smells_count,
+        "complexity_score": complexity_score
+    }
+
+def calculate_ast_depth(tree, depth=0):
+    if tree.getChildCount() == 0:
+        return depth
+    else:
+        return max(calculate_ast_depth(tree.getChild(i), depth+1) for i in range(tree.getChildCount()))
+
+def execution_plan_exec(sql_content, db_credentials, execution_plan_diagram, separator=";"):
+    parts = sql_content.split(separator)
+    for i in range(len(parts) - 1):
+        if parts[i] is not None or parts[i] != '':
+            query = parts[i] + separator    
+            execution_plan = get_execution_plan(query, db_credentials)
+            execution_plan_diagram.append(create_execution_plan_tree_base64(execution_plan))
+    
+    return parts
+
+def analyze_sql(sql_content, messages, db_credentials=None, generate_execution_plan=False):
     input_stream = InputStream(sql_content)
     lexer = PostgreSqlGrammarLexer(input_stream)
     token_stream = CommonTokenStream(lexer)
@@ -612,6 +762,13 @@ def analyze_sql(sql_content, messages, db_credentials=None):
 
     visitor = SmellVisitor(messages, db_credentials)
     visitor.visit(tree)
+
+    execution_plan_diagram = []
+    if generate_execution_plan and db_credentials:
+        execution_plan_exec(sql_content, db_credentials, execution_plan_diagram)
+
+    smells_bar_chart = create_smells_bar_chart(visitor.smells)
+    complexity_score = calculate_complexity(visitor, tree)
 
     # Agrupar mensajes por línea sin duplicados
     detailed_messages = {}
@@ -640,12 +797,23 @@ def analyze_sql(sql_content, messages, db_credentials=None):
     return json.dumps({
         "lexicalErrors": [],
         "syntaxErrors": [],
-        "codeSmells": detailed_messages_list
+        "codeSmells": detailed_messages_list,
+        "executionPlan": execution_plan_diagram if generate_execution_plan else None,
+        "smellsBarChart": smells_bar_chart,
+        "complexityScore": complexity_score
     }, indent=2)
 
 def read_json_file(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
+
+def str_to_bool(value):
+    if isinstance(value, str):
+        if value.lower() in ['true', '1', 't', 'yes', 'y']:
+            return True
+        elif value.lower() in ['false', '0', 'f', 'no', 'n']:
+            return False
+    raise False
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -664,14 +832,14 @@ if __name__ == "__main__":
             "database": sys.argv[6]
         }
 
-    result = analyze_sql(query, messages, db_credentials)
+    result = analyze_sql(query, messages, db_credentials, str_to_bool(sys.argv[7]))
     print(result)
 
 
 
-# def read_sql_file(file_path):
-#     with open(file_path, 'r') as file:
-#         return file.read()
+def read_sql_file(file_path):
+    with open(file_path, 'r') as file:
+        return file.read()
     
 # if __name__ == "__main__":
 #     # Ajustar la ruta para subir dos niveles en el directorio
@@ -691,5 +859,5 @@ if __name__ == "__main__":
 #         "database": "testdb"
 #     }
 
-#     result = analyze_sql(query, messages, db_credentials)
+#     result = analyze_sql(query, messages, db_credentials, True)
 #     print(result)

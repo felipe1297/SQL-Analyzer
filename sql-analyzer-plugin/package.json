@@ -68,6 +68,11 @@
           "type": "boolean",
           "default": false,
           "description": "Analyze with DB"
+        },
+        "sqlAnalyzer.showDiagram": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show diagrams with the analysis"
         }
       }
     }
