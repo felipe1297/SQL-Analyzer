@@ -272,6 +272,12 @@ function getEmojiForComplexityScore(score: number): string {
     }
 }
 
+function removeComments(sql: string): string {
+    sql = sql.replace(/--.*?(\r?\n|$)/g, '');
+    sql = sql.replace(/\/\*[\s\S]*?\*\//g, '');
+    return sql;
+}
+
 
 function createWebviewPanel(executionPlan: string[], smellsBarChart: string, codeSmells: { line: number, message: string, smells: { line: number, code: string, message: string, recommendation: string, example: { bad: string, good: string } }[] }[], queries: string, complexityScores: any) {
     const panel = vscode.window.createWebviewPanel(
@@ -283,15 +289,15 @@ function createWebviewPanel(executionPlan: string[], smellsBarChart: string, cod
         }
     );
 
-    // Separar las consultas por ';' y eliminar saltos de línea
-    const queryList = queries.split(';').map(query => query.trim()).filter(query => query.length > 0);
+    const cleanedQueries = removeComments(queries);
+    const queryList = cleanedQueries.split(';').map(query => query.trim()).filter(query => query.length > 0);
 
     const headers = `
-            <div class="complexity-header">
-                <div class="emoji"> Depth: ${getEmojiForDepth(complexityScores.depth)}</div>
-                <div class="emoji"> Code Smells Count: ${getEmojiForSmellsCount(complexityScores.smells_count)}</div>
-                <div class="emoji"> Complexity Score: ${getEmojiForComplexityScore(complexityScores.complexity_score)}</div>
-            </div>
+        <div class="complexity-header">
+            <div class="emoji"> Depth: ${getEmojiForDepth(complexityScores.depth)}</div>
+            <div class="emoji"> Code Smells Count: ${getEmojiForSmellsCount(complexityScores.smells_count)}</div>
+            <div class="emoji"> Complexity Score: ${getEmojiForComplexityScore(complexityScores.complexity_score)}</div>
+        </div>
     `;
 
     const codeSmellsHTML = codeSmells.map(item => item.smells.map(smell => `
@@ -306,8 +312,7 @@ function createWebviewPanel(executionPlan: string[], smellsBarChart: string, cod
         </div>
     `).join("")).join("");
 
-    // Incluir títulos de las consultas y la información de complejidad
-    const executionPlanHTML =  headers + executionPlan.map((svg, index) => {
+    const executionPlanHTML = headers + executionPlan.map((svg, index) => {
         return `
         <div class="svg-item">
             <div class="title">Query ${index + 1}: ${queryList[index]};</div>
@@ -327,7 +332,10 @@ function createWebviewPanel(executionPlan: string[], smellsBarChart: string, cod
     }, 500);
 }
 
+
 function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, codeSmellsHTML: string, queries: string[], complexityScores: any[]): string {
+    const escudoUNALPath = vscode.Uri.file(path.join(__dirname, 'UNAL.png')).with({ scheme: 'vscode-resource' });
+
     return `
         <!DOCTYPE html>
         <html lang="en">
@@ -450,6 +458,18 @@ function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, co
                 .complexity-header .emoji {
                     font-size: 1.5em;
                 }
+                .footer {
+                    margin-top: 30px;
+                    padding: 10px;
+                    text-align: center;
+                    font-size: 0.9em;
+                    color: #666;
+                }
+                .footer img {
+                    width: 50px;
+                    height: auto;
+                    margin-bottom: 10px;
+                }
             </style>
         </head>
         <body>
@@ -460,6 +480,17 @@ function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, co
                 <div class="bar-chart"><img src="data:image/png;base64,${smellsBarChart}" /></div>
                 <h1>Code Smells</h1>
                 <div class="code-smells">${codeSmellsHTML}</div>
+            </div>
+            <div class="footer">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Escudo_Universidad_Nacional_de_Colombia.svg/455px-Escudo_Universidad_Nacional_de_Colombia.svg.png" alt="Universidad Nacional de Colombia" />
+                <p>
+                    Universidad Nacional de Colombia - Sede Bogotá<br>
+                    Facultad de Ingeniería<br>
+                    Curso: Lenguajes de Programación 2024-I<br>
+                    Profesor: PhD Ingeniero Felipe Restrepo Calle<br>
+                    Integrantes: Diego Felipe Solorzano, Laura Andrea Castiblanco, Felipe Esteban Riaño<br>
+                    Plugin: SQL Analyzer
+                </p>
             </div>
             <script>
                 function toggleMinimize(button) {
@@ -477,6 +508,8 @@ function getWebviewContent(executionPlanHTML: string, smellsBarChart: string, co
         </body>
         </html>`;
 }
+
+
 
 export function activate(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('sqlAnalyzer');

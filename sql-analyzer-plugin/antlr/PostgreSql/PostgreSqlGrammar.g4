@@ -194,7 +194,9 @@ expr:
 	| ID BETWEEN expr AND expr
 	| LPAREN select_stmt RPAREN
 	| case_expr
-	| comparatorExpr ((EQ | NEQ | LT | LTE | GT | GTE) (expr | STRING | NUMBER | (ID (DOT ID)?)))?;
+	| comparatorExpr ((EQ | NEQ | LT | LTE | GT | GTE) (expr | STRING | NUMBER | (ID (DOT ID)?)))?
+	| comparatorExpr IN (LPAREN comparatorExpr (COMMA comparatorExpr)* RPAREN)
+	| comparatorExpr LIKE STRING;
 
 comparatorExpr:
     (STRING | NUMBER | (ID (DOT ID)?))
@@ -363,6 +365,7 @@ ADD: A D D;
 COLUMN: C O L U M N;
 DATABASE: D A T A B A S E;
 LIMIT: L I M I T;
+IN: I N;
 
 // Funciones de cadena
 LEN: L E N;
